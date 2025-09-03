@@ -141,11 +141,7 @@ class PrivacyPolicy extends StatelessWidget {
                       ),
                     ),
                     onPressed: () {
-                      // CRITICAL FIX: The I UNDERSTAND button now navigates to z_Settings.dart
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const z_Settings()),
-                      );
+                      Navigator.pop(context);
                     },
                     child: const Text(
                       'I UNDERSTAND',

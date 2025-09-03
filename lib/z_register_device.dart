@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'z_settings.dart';
+import 'database/firebase_db.dart';
 
 class UserFormData {
   final TextEditingController fullnameController;
@@ -35,6 +35,7 @@ class z_settingsRegister extends StatefulWidget {
 
 class _z_settingsRegisterState extends State<z_settingsRegister> {
   final Color ilocateRed = const Color(0xFFC70000);
+  bool _isLoading = false;
 
   // A single instance for the user form.
   final UserFormData _userForm = UserFormData();
@@ -77,11 +78,17 @@ class _z_settingsRegisterState extends State<z_settingsRegister> {
     }
   }
 
-  /// Function to handle the "REGISTER" button press.
-  void _onRegister() {
+  // Function to handle the "REGISTER" button press.
+  void _onRegister() async {
     if (_userForm.formKey.currentState!.validate() &&
         _userForm.selectedDate != null &&
         _userForm.selectedSex != null) {
+
+      // Loading Screen
+      setState(() {
+        _isLoading = true;
+      });
+
       final Map<String, String> newUserData = {
         'fullname': _userForm.fullnameController.text,
         'phone': _userForm.phoneController.text,
@@ -91,16 +98,192 @@ class _z_settingsRegisterState extends State<z_settingsRegister> {
         'devuid': _userForm.devuidController.text,
       };
 
-      print('New User Data: $newUserData');
+      final result = await DatabaseService().createDevice(newUserData);
 
-      // The key change: pop with a result.
-      Navigator.pop(context, 'success');
+       setState(() {
+        _isLoading = false;
+      });
+
+      String title;
+      String message;
+      bool isSuccess = result['success'] == true;
+
+      if (isSuccess) {
+        title = 'Success';
+        message = 'Device registered successfully!';
+      } else {
+        title = 'Error';
+        bool hasDevuidDuplicate = result['devuid'] == true;
+        bool hasPhoneDuplicate = result['phone'] == true;
+
+        if (hasDevuidDuplicate || hasPhoneDuplicate) {
+          message = 'Failed to register device. The following issues were found:\n';
+          
+          if (hasDevuidDuplicate) {
+            message += '- DEVUID already exists.\n';
+          }
+          
+          if (hasPhoneDuplicate) {
+            message += '- Phone number already exists.\n';
+          }
+        } else {
+          message = 'An unknown error occurred.';
+        }
+      }
+
+    // Show custom dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final Color headerColor = isSuccess ? Colors.green : ilocateRed;
+
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: headerColor),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              isSuccess ? Icons.check_circle : Icons.error,
+                              color: headerColor,
+                              size: 32,
+                            ),
+                            const SizedBox(width: 8.0),
+                            Text(
+                              title.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 20.0,
+                                fontWeight: FontWeight.bold,
+                                color: headerColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8.0),
+                        Text(
+                          message,
+                          style: const TextStyle(fontSize: 14.0),
+                        ),
+                        const SizedBox(height: 24.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                if (isSuccess) {
+                                  Navigator.pop(context, newUserData);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                splashFactory: NoSplash.splashFactory,
+                                backgroundColor: headerColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                              ),
+                              child: const Text(
+                                'OK',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill out all fields.'),
-          backgroundColor: Colors.red,
-        ),
+      // Incomplete form
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: Colors.transparent,
+            contentPadding: const EdgeInsets.all(0),
+            content: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                color: Colors.white,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(height: 4, color: ilocateRed),
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.warning, color: ilocateRed, size: 32),
+                              const SizedBox(width: 8.0),
+                              Text(
+                                'INCOMPLETE FORM',
+                                style: TextStyle(
+                                  fontSize: 20.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: ilocateRed,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(color: Colors.black26),
+                          const SizedBox(height: 8.0),
+                          const Text(
+                            'Please fill out all fields.',
+                            style: TextStyle(fontSize: 14.0),
+                          ),
+                          const SizedBox(height: 24.0),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: ElevatedButton.styleFrom(
+                                  splashFactory: NoSplash.splashFactory,
+                                  backgroundColor: ilocateRed,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30.0),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'OK',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          )
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       );
     }
   }
@@ -145,43 +328,60 @@ class _z_settingsRegisterState extends State<z_settingsRegister> {
           ),
         ),
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  _buildUserForm(_userForm),
-                  const SizedBox(height: 24.0),
-                  // REGISTER button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _onRegister,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ilocateRed,
-                        padding: const EdgeInsets.symmetric(vertical: 16.0),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24.0),
+      body: Stack(
+        children: [
+          // Main content
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      _buildUserForm(_userForm),
+                      const SizedBox(height: 24.0),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _onRegister,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ilocateRed,
+                            padding: const EdgeInsets.symmetric(vertical: 16.0),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24.0),
+                            ),
+                          ),
+                          child: const Text(
+                            'REGISTER',
+                            style: TextStyle(
+                              fontSize: 18.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
-                      child: const Text(
-                        'REGISTER',
-                        style: TextStyle(
-                          fontSize: 18.0,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+
+          // Loading overlay
+          if (_isLoading) ...[
+            const Opacity(
+              opacity: 0.7,
+              child: ModalBarrier(dismissible: false, color: Colors.black),
+            ),
+            const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFC70000)),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -240,6 +440,7 @@ class _z_settingsRegisterState extends State<z_settingsRegister> {
           TextFormField(
             controller: controller,
             obscureText: obscureText,
+            maxLength: type == 'phone' ? 11 : (type == 'devuid' ? 16 : null),
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';

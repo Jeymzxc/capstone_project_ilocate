@@ -182,11 +182,7 @@ class TermsAndConditions extends StatelessWidget {
                       ),
                     ),
                     onPressed: () {
-                      // CRITICAL FIX: The I AGREE button now navigates to z_Settings.
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const z_Settings()),
-                      );
+                      Navigator.pop(context);
                     },
                     child: const Text(
                       'I AGREE',

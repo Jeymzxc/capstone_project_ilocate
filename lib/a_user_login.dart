@@ -21,6 +21,7 @@ class _UserLoginState extends State<UserLogin> {
   final FocusNode _passwordFocus = FocusNode();
 
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -127,186 +128,222 @@ class _UserLoginState extends State<UserLogin> {
       return;
     }
 
-    // Call Firebase service for login
-    final isLoggedIn = await DatabaseService().adminLogin(username, password);
+    // Set loading state to true
+    setState(() {
+      _isLoading = true;
+    });
 
-  if (isLoggedIn) {
-      await _showAlertDialog(
-        'Login Successful',
-        'Welcome, $username!',
-        Colors.green, 
-        Icons.check_circle,
-      );
-      // Navigate to Admin screen
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AdminNavigationScreen()),
-      );
-    } else {
-      // Show error if login failed
-      await _showAlertDialog(
-        'Login Failed',
-        'Incorrect username/password. Please check your credentials again.',
-        ilocateRed,
-        Icons.cancel,
-      );
+    try {
+      // Call Firebase service for login
+      final isLoggedIn = await DatabaseService().adminLogin(username, password);
+
+      if (isLoggedIn) {
+        await _showAlertDialog(
+          'Login Successful',
+          'Welcome, $username!',
+          Colors.green,
+          Icons.check_circle,
+        );
+        // Navigate to Admin screen
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AdminNavigationScreen()),
+          );
+        }
+      } else {
+        // Show error if login failed
+        await _showAlertDialog(
+          'Login Failed',
+          'Incorrect username/password. Please check your credentials again.',
+          ilocateRed,
+          Icons.cancel,
+        );
+      }
+    } finally {
+      // Set loading state to false regardless of the login result
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
+    @override
+    Widget build(BuildContext context) {
+      final OutlineInputBorder roundedBorder = OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: const BorderSide(color: Colors.grey),
+      );
 
-  @override
-  Widget build(BuildContext context) {
-    final OutlineInputBorder roundedBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(15),
-      borderSide: const BorderSide(color: Colors.grey),
-    );
-
-    return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          child: SizedBox(
-            width: 400,
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 180,
-                    height: 180,
-                    child: Image.asset(
-                      'assets/Logo1.png',
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
-                      isAntiAlias: true,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Column(
-                    children: [
-                      Text(
-                        'ILocate',
-                        style: TextStyle(
-                          fontSize: 34,
-                          fontWeight: FontWeight.bold,
-                          color: ilocateRed,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text('DISASTER',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: ilocateRed)),
-                      const SizedBox(height: 2),
-                      Text('RESPONDER APP',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: ilocateRed)),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-
-                  // 👤 Username Field
-                  TextField(
-                    controller: _usernameController,
-                    focusNode: _usernameFocus,
-                    decoration: InputDecoration(
-                      labelText: 'Username',
-                      labelStyle: TextStyle(
-                          color: _getLabelColor(_usernameFocus)),
-                      prefixIcon: Icon(Icons.person, color: _getLabelColor(_usernameFocus)),
-                      focusedBorder: roundedBorder.copyWith(
-                        borderSide: BorderSide(color: ilocateRed, width: 2),
-                      ),
-                      enabledBorder: roundedBorder,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    onTap: () => setState(() {}),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // 🔒 Password Field
-                  TextField(
-                    controller: _passwordController,
-                    focusNode: _passwordFocus,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      labelStyle: TextStyle(
-                          color: _getLabelColor(_passwordFocus)),
-                      prefixIcon: Icon(Icons.lock, color: _getLabelColor(_passwordFocus)),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                          color: Colors.grey,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                      focusedBorder: roundedBorder.copyWith(
-                        borderSide: BorderSide(color: ilocateRed, width: 2),
-                      ),
-                      enabledBorder: roundedBorder,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    onTap: () => setState(() {}),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // 🔗 Forgot Password Navigation
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ForgotPassword(),
+      return Scaffold(
+        body: Stack(
+          children: [
+            // Main login form content
+            Center(
+              child: SingleChildScrollView(
+                child: SizedBox(
+                  width: 400,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 180,
+                          height: 180,
+                          child: Image.asset(
+                            'assets/Logo1.png',
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                            isAntiAlias: true,
                           ),
-                        );
-                      },
-                      child: const Text(
-                        'Forgot Password?',
-                        style: TextStyle(color: Colors.blue), // Reverted to blue
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                        ),
+                        const SizedBox(height: 12),
+                        Column(
+                          children: [
+                            Text(
+                              'ILocate',
+                              style: TextStyle(
+                                fontSize: 34,
+                                fontWeight: FontWeight.bold,
+                                color: ilocateRed,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text('DISASTER',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                    color: ilocateRed)),
+                            const SizedBox(height: 2),
+                            Text('RESPONDER APP',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                    color: ilocateRed)),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
 
-                  // 🔴 Login Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _handleLogin,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ilocateRed,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text(
-                        'Login',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1),
-                      ),
+                        // Username Field
+                        SizedBox(
+                          height: 60, 
+                          child: TextField(
+                            controller: _usernameController,
+                            focusNode: _usernameFocus,
+                            decoration: InputDecoration(
+                              labelText: 'Username',
+                              labelStyle: TextStyle(
+                                  color: _getLabelColor(_usernameFocus)),
+                              prefixIcon: Icon(Icons.person, color: _getLabelColor(_usernameFocus)),
+                              focusedBorder: roundedBorder.copyWith(
+                                borderSide: BorderSide(color: ilocateRed, width: 2),
+                              ),
+                              enabledBorder: roundedBorder,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                            onTap: () => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Password Field
+                        SizedBox(
+                          height: 60, 
+                          child: TextField(
+                            controller: _passwordController,
+                            focusNode: _passwordFocus,
+                            obscureText: _obscurePassword,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              labelStyle: TextStyle(
+                                  color: _getLabelColor(_passwordFocus)),
+                              prefixIcon: Icon(Icons.lock, color: _getLabelColor(_passwordFocus)),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                              ),
+                              focusedBorder: roundedBorder.copyWith(
+                                borderSide: BorderSide(color: ilocateRed, width: 2),
+                              ),
+                              enabledBorder: roundedBorder,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                            onTap: () => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Forgot Password Navigation
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ForgotPassword(),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'Forgot Password?',
+                              style: TextStyle(color: Colors.blue), // Reverted to blue
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Login Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _handleLogin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: ilocateRed,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text(
+                              'Login',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                ],
+                ),
               ),
             ),
-          ),
+            // Loading overlay
+            if (_isLoading)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withOpacity(0.5),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(ilocateRed),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
-      ),
-    );
+      );
+    }
   }
-}

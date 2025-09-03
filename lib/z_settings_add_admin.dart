@@ -64,6 +64,7 @@ class z_settingsAdd extends StatefulWidget {
 class _z_settingsAddState extends State<z_settingsAdd> {
   final Color ilocateRed = const Color(0xFFC70000);
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   // A single instance for the admin form.
   final AdminFormData _adminForm = AdminFormData();
@@ -112,6 +113,11 @@ class _z_settingsAddState extends State<z_settingsAdd> {
         _adminForm.selectedDate != null &&
         _adminForm.selectedSex != null) {
 
+      // Loading Screen
+      setState(() {
+        _isLoading = true;
+      });
+
       final newAdminData = {
         'fullname': _adminForm.fullnameController.text,
         'username': _adminForm.usernameController.text,
@@ -125,6 +131,10 @@ class _z_settingsAddState extends State<z_settingsAdd> {
       };
 
       final result = await DatabaseService().createAdmin(newAdminData);
+
+      setState(() {
+        _isLoading = false;
+      });
 
       String title;
       String message;
@@ -313,86 +323,100 @@ class _z_settingsAddState extends State<z_settingsAdd> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        toolbarHeight: 120.0,
-        backgroundColor: ilocateRed,
-        title: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Text(
-                'ADD',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 26.0,
-                ),
-              ),
-              Text(
-                'ADMIN',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 26.0,
-                ),
-              ),
-            ],
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 30.0),
-          // CORRECTED: Use pop() to go back to the previous route.
-          onPressed: () => Navigator.pop(context),
-        ),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(10),
-          ),
-        ),
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            toolbarHeight: 120.0,
+            backgroundColor: ilocateRed,
+            title: Center(
               child: Column(
-                children: [
-                  _buildAdminForm(_adminForm),
-                  const SizedBox(height: 24.0),
-                  // DONE button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _onDone,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ilocateRed,
-                        padding: const EdgeInsets.symmetric(vertical: 16.0),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24.0),
-                        ),
-                      ),
-                      child: const Text(
-                        'DONE',
-                        style: TextStyle(
-                          fontSize: 18.0,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Text(
+                    'ADD',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 26.0,
+                    ),
+                  ),
+                  Text(
+                    'ADMIN',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 26.0,
                     ),
                   ),
                 ],
               ),
             ),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 30.0),
+              onPressed: () => Navigator.pop(context),
+            ),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(10),
+              ),
+            ),
+          ),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      _buildAdminForm(_adminForm),
+                      const SizedBox(height: 24.0),
+                      // DONE button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _onDone,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ilocateRed,
+                            padding: const EdgeInsets.symmetric(vertical: 16.0),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24.0),
+                            ),
+                          ),
+                          child: const Text(
+                            'DONE',
+                            style: TextStyle(
+                              fontSize: 18.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-      ),
+        // Overlay for the loading screen.
+        if (_isLoading)
+          const Opacity(
+            opacity: 0.7,
+            child: ModalBarrier(dismissible: false, color: Colors.black),
+          ),
+        if (_isLoading)
+          const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFC70000)),
+            ),
+          ),
+      ],
     );
   }
 
@@ -454,6 +478,7 @@ class _z_settingsAddState extends State<z_settingsAdd> {
           TextFormField(
             controller: controller,
             obscureText: type == 'password' ? _obscurePassword : obscureText,
+            maxLength: type == 'phone' ? 11 : null,
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';
@@ -501,6 +526,13 @@ class _z_settingsAddState extends State<z_settingsAdd> {
             },
             decoration: InputDecoration(
               errorStyle: const TextStyle(color: Colors.red),
+              helperText: type == 'password'
+                  ? 'Password must be at least 8 characters long.\nInclude uppercase, lowercase, number, and a special character. \nExample: Password#123'
+                  : null,
+              helperStyle: const TextStyle(
+                fontSize: 12.0,
+                color: Colors.grey,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: ilocateRed, width: 2.0),

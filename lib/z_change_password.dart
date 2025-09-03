@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'z_settings.dart'; // Import the z_Settings.dart file
 
 class SettingsPassword extends StatefulWidget {
   const SettingsPassword({super.key});
@@ -158,10 +157,7 @@ class _SettingsPasswordState extends State<SettingsPassword> {
           'Password successfully changed!',
           Colors.green,
           onOk: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const z_Settings()),
-            );
+            Navigator.pop(context);
           },
         );
         // Clear text fields after successful change
@@ -220,10 +216,7 @@ class _SettingsPasswordState extends State<SettingsPassword> {
                   IconButton(
                     icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
                     onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const z_Settings()),
-                      );
+                     Navigator.pop(context);
                     },
                   ),
                   const Expanded(
@@ -422,12 +415,7 @@ class _SettingsPasswordState extends State<SettingsPassword> {
             // 🔙 Return Button at the bottom
             InkWell(
               onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const z_Settings(),
-                  ),
-                );
+                Navigator.pop(context);
               },
               child: Container(
                 width: double.infinity,

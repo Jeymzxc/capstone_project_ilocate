@@ -111,4 +111,119 @@ class DatabaseService {
       return {'success': false}; // Indicate failure with a map
     }
   }
+  
+  // Display all Admins
+  Future<List<Map<String, dynamic>>> getAdmins() async {
+    try {
+      DatabaseEvent event = await _db.child('admins').once();
+      if (event.snapshot.value == null) {
+        return [];
+      }
+      final Map<String, dynamic> adminsMap = Map<String, dynamic>.from(event.snapshot.value as Map);
+      
+      List<Map<String, dynamic>> adminsList = [];
+      adminsMap.forEach((key, value) {
+        final adminData = Map<String, dynamic>.from(value as Map);
+        adminData['id'] = key; 
+        adminsList.add(adminData);
+      });
+      return adminsList;
+    } catch (e) {
+      print('Firebase error fetching admins: $e');
+      return [];
+    }
+  }
+
+  // Function to delete an admin
+  Future<void> deleteAdmin(String adminId) async {
+    try {
+      await _db.child('admins').child(adminId).remove();
+      print('Admin with ID $adminId deleted successfully');
+    } catch (e) {
+      print('Firebase error deleting admin: $e');
+    }
+  }
+
+  // Check for duplicate phone and devUid
+  Future<Map<String, bool>> _checkDeviceDuplicates(Map<String, dynamic> deviceData) async {
+    Map<String, bool> duplicates = {
+      'phone': false,
+      'devuid': false,
+    };
+
+    try {
+      // List of fields to check
+      final fieldsToCheck = ['phone', 'devuid'];
+
+      for (String field in fieldsToCheck) {
+        Query query = _db.child('devices').orderByChild(field).equalTo(deviceData[field]);
+        DatabaseEvent event = await query.once();
+
+        if (event.snapshot.value != null) {
+          duplicates[field] = true;
+        }
+      }
+
+      return duplicates;
+    } catch (e) {
+      print('Firebase error while checking for device duplicates: $e');
+      return duplicates; 
+    }
+  }
+
+  // Register Device
+  Future<Map<String, dynamic>> createDevice(Map<String, dynamic> deviceData) async {
+    try {
+      // Check duplicates for phone & devUid
+      final duplicates = await _checkDeviceDuplicates(deviceData);
+
+      if (duplicates['devuid']! || duplicates['phone']!) {
+        return {
+          'success': false,
+          'devuid': duplicates['devuid'],
+          'phone': duplicates['phone'],
+        };
+      }
+
+      // If no duplicates, save device
+      await _db.child('devices').push().set(deviceData);
+      print('Device created successfully');
+      return {'success': true};
+    } catch (e) {
+      print('Firebase error while creating device: $e');
+      return {'success': false};
+    }
+  }
+
+  // Display all Devices
+  Future<List<Map<String, dynamic>>> getDevices() async {
+    try {
+      DatabaseEvent event = await _db.child('devices').once();
+      if (event.snapshot.value == null) {
+        return [];
+      }
+      final Map<String, dynamic> devicesMap = Map<String, dynamic>.from(event.snapshot.value as Map);
+      
+      List<Map<String, dynamic>> devicesList = [];
+      devicesMap.forEach((key, value) {
+        final deviceData = Map<String, dynamic>.from(value as Map);
+        deviceData['id'] = key;
+        devicesList.add(deviceData);
+      });
+      return devicesList;
+    } catch (e) {
+      print('Firebase error fetching devices: $e');
+      return [];
+    }
+  }
+
+  // Function to delete a device
+  Future<void> deleteDevice(String deviceId) async {
+    try {
+      await _db.child('devices').child(deviceId).remove();
+      print('Device with ID $deviceId deleted successfully');
+    } catch (e) {
+      print('Firebase error deleting device: $e');
+    }
+  }
 }

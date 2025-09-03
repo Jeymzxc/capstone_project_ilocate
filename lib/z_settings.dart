@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'a_user_login.dart';
 import 'z_change_password.dart';
-import 'z_settings_add_admin.dart';
+import 'z_settings_add_admin.dart'; 
 import 'z_register_device.dart'; 
 import 'z_terms_n_conditions.dart';
 import 'z_privacy_policy.dart';
+import 'z_manage_users.dart'; 
 
 class z_Settings extends StatefulWidget {
   const z_Settings({super.key});
@@ -22,7 +23,6 @@ class _z_SettingsState extends State<z_Settings> {
       MaterialPageRoute(builder: (context) => const z_settingsRegister()),
     );
 
-    // Check if the result is 'success' and show a SnackBar
     if (result == 'success' && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -34,7 +34,6 @@ class _z_SettingsState extends State<z_Settings> {
     }
   }
 
-  // Function to show a confirmation dialog for logout
   void _showLogoutConfirmationDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -90,7 +89,7 @@ class _z_SettingsState extends State<z_Settings> {
                           children: [
                             OutlinedButton(
                               onPressed: () {
-                                Navigator.of(context).pop(); // Close the dialog
+                                Navigator.of(context).pop();
                               },
                               style: OutlinedButton.styleFrom(
                                 splashFactory: NoSplash.splashFactory,
@@ -107,7 +106,7 @@ class _z_SettingsState extends State<z_Settings> {
                             const SizedBox(width: 8.0),
                             ElevatedButton(
                               onPressed: () {
-                                Navigator.of(context).pop(); // Close the dialog
+                                Navigator.of(context).pop();
                                 Navigator.pushReplacement(
                                   context,
                                   MaterialPageRoute(builder: (context) => const UserLogin()),
@@ -139,7 +138,6 @@ class _z_SettingsState extends State<z_Settings> {
     );
   }
 
-  // The helper functions can remain unchanged
   Widget buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12.0),
@@ -274,24 +272,17 @@ class _z_SettingsState extends State<z_Settings> {
                   },
                   context: context,
                 ),
+                // Manage Admins and Users
                 buildItem(
-                  label: 'Add Admin',
-                  icon: Icons.person_add,
+                  label: 'Manage Admins & Devices',
+                  icon: Icons.group,
                   isBold: true,
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const z_settingsAdd()),
+                      MaterialPageRoute(builder: (context) => const z_settingsManageUsers()),
                     );
                   },
-                  context: context,
-                ),
-                // The updated onPressed callback for Register Device
-                buildItem(
-                  label: 'Register Device',
-                  icon: Icons.devices,
-                  isBold: true,
-                  onTap: _navigateToRegister,
                   context: context,
                 ),
 
