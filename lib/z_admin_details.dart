@@ -1,13 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class z_adminDetails extends StatelessWidget {
   final Map<String, dynamic> admin;
 
   const z_adminDetails({super.key, required this.admin});
 
+  // Format Date into a readable format
+    String _formatDate(String dateString) {
+      if (dateString.isEmpty) {
+        return 'N/A';
+      }
+      try {
+        // Parse the date string "YYYY-MM-DD"
+        final parts = dateString.split('-');
+        if (parts.length != 3) {
+          return dateString; 
+        }
+
+        final year = int.tryParse(parts[0]);
+        final month = int.tryParse(parts[1]);
+        final day = int.tryParse(parts[2]);
+
+        if (year == null || month == null || day == null) {
+          return dateString;
+        }
+
+        final dateTime = DateTime(year, month, day);
+        return DateFormat('MMMM d, yyyy').format(dateTime);
+      } catch (e) {
+        return dateString; 
+      }
+    }
+
+
   @override
   Widget build(BuildContext context) {
     final Color ilocateRed = const Color(0xFFC70000);
+    final formattedDateOfBirth = _formatDate(admin['dateOfBirth'] ?? '');
 
     return Scaffold(
       appBar: AppBar(
@@ -70,7 +100,7 @@ class z_adminDetails extends StatelessWidget {
               ),
               _buildDetailCard(
                 'Date of Birth',
-                admin['dateOfBirth'] ?? 'N/A',
+                formattedDateOfBirth,
                 Icons.cake,
                 ilocateRed,
               ),

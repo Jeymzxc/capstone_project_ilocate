@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'a_user_login.dart';
 import 'z_change_password.dart';
-import 'z_settings_add_admin.dart'; 
-import 'z_register_device.dart'; 
 import 'z_terms_n_conditions.dart';
 import 'z_privacy_policy.dart';
 import 'z_manage_users.dart'; 
@@ -16,23 +14,6 @@ class z_Settings extends StatefulWidget {
 
 class _z_SettingsState extends State<z_Settings> {
   final Color ilocateRed = const Color(0xFFC70000);
-
-  void _navigateToRegister() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const z_settingsRegister()),
-    );
-
-    if (result == 'success' && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Device registered successfully!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
-        ),
-      );
-    }
-  }
 
   void _showLogoutConfirmationDialog(BuildContext context) {
     showDialog(

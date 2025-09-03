@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'z_settings.dart';
 
 class PrivacyPolicy extends StatelessWidget {
   const PrivacyPolicy({super.key});
@@ -13,7 +12,6 @@ class PrivacyPolicy extends StatelessWidget {
         backgroundColor: ilocateRed,
         toolbarHeight: 90.0,
         leading: GestureDetector(
-          // The back button will pop the current page, which will return to z_Settings.dart.
           onTap: () => Navigator.pop(context),
           child: const Padding(
             padding: EdgeInsets.only(left: 16.0),

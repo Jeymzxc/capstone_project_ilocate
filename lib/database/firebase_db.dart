@@ -1,4 +1,5 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bcrypt/bcrypt.dart';
 
 class DatabaseService {
@@ -18,6 +19,37 @@ class DatabaseService {
     });
   }
 
+  // Change admin password
+  Future<bool> changePassword(String adminId, String oldPassword, String newPassword) async {
+    try {
+      // Step 1: Fetch the current admin data by their ID
+      DatabaseEvent event = await _db.child('admins').child(adminId).once();
+
+      if (event.snapshot.value == null) {
+        print('Admin not found');
+        return false;
+      }
+
+      final adminData = Map<String, dynamic>.from(event.snapshot.value as Map);
+      final storedPassword = adminData['password'];
+
+      // Step 2: Verify the old password
+      if (!BCrypt.checkpw(oldPassword, storedPassword)) {
+        print('Incorrect old password');
+        return false;
+      }
+
+      // Step 3: Hash the new password and update the database
+      final hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+      await _db.child('admins').child(adminId).update({'password': hashedPassword});
+
+      print('Password changed successfully for admin ID: $adminId');
+      return true;
+    } catch (e) {
+      print('Firebase error changing password: $e');
+      return false;
+    }
+  }
 
   // Admin login
   Future<bool> adminLogin(String username, String password) async {
@@ -27,11 +59,17 @@ class DatabaseService {
 
       if (event.snapshot.value != null) {
         final admins = Map<String, dynamic>.from(event.snapshot.value as Map);
+        final adminId = admins.keys.first;
         final adminData = admins.values.first; // There should only be one result
 
         final storedPassword = adminData['password'];
         if (BCrypt.checkpw(password, storedPassword)) {
           print('Admin login successful');
+
+          // Store the admin ID locally
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('adminId', adminId);
+
           return true;
         } else {
           print('Password incorrect');

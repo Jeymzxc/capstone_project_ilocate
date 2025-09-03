@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'z_settings.dart';
 
 class TermsAndConditions extends StatelessWidget {
   const TermsAndConditions({super.key});
