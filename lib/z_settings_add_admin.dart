@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'database/firebase_db.dart';
 
 // A new class to hold the data and controllers for a single member's form.
 class AdminFormData {
@@ -62,6 +63,7 @@ class z_settingsAdd extends StatefulWidget {
 
 class _z_settingsAddState extends State<z_settingsAdd> {
   final Color ilocateRed = const Color(0xFFC70000);
+  bool _obscurePassword = true;
 
   // A single instance for the admin form.
   final AdminFormData _adminForm = AdminFormData();
@@ -104,12 +106,13 @@ class _z_settingsAddState extends State<z_settingsAdd> {
     }
   }
 
-  /// Function to handle the "DONE" button press.
-  void _onDone() {
+  // Function to handle the "DONE" button press.
+  void _onDone() async {
     if (_adminForm.formKey.currentState!.validate() &&
         _adminForm.selectedDate != null &&
         _adminForm.selectedSex != null) {
-      final Map<String, String> newAdminData = {
+
+      final newAdminData = {
         'fullname': _adminForm.fullnameController.text,
         'username': _adminForm.usernameController.text,
         'email': _adminForm.emailController.text,
@@ -121,19 +124,195 @@ class _z_settingsAddState extends State<z_settingsAdd> {
         'address': _adminForm.addressController.text,
       };
 
-      print('New Admin Data: $newAdminData');
+      final result = await DatabaseService().createAdmin(newAdminData);
 
-      // Navigate back to z_Settings.dart with the new data.
-      Navigator.pop(context, newAdminData);
+      String title;
+      String message;
+      bool isSuccess = result['success'] == true;
+
+      if (isSuccess) {
+        title = 'Success';
+        message = 'Admin registered successfully!';
+      } else {
+        title = 'Error';
+        message = 'Failed to register admin. The following issues were found:\n';
+        
+        if (result['username'] == true) {
+          message += '- Username already exists.\n';
+        }
+        if (result['email'] == true) {
+          message += '- Email already exists.\n';
+        }
+        if (result['phone'] == true) {
+          message += '- Phone number already exists.\n';
+        }
+        if (result['acdvId'] == true) {
+          message += '- ACDVID already exists.\n';
+        }
+        
+        // If none of the specific duplicates were found, add a generic message
+        if (message == 'Failed to register admin. The following issues were found:\n') {
+          message += '- Unknown error occurred.';
+        }
+      }
+
+    // Show custom dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final Color headerColor = isSuccess ? Colors.green : ilocateRed;
+
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: headerColor),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              isSuccess ? Icons.check_circle : Icons.error,
+                              color: headerColor,
+                              size: 32,
+                            ),
+                            const SizedBox(width: 8.0),
+                            Text(
+                              title.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 20.0,
+                                fontWeight: FontWeight.bold,
+                                color: headerColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8.0),
+                        Text(
+                          message,
+                          style: const TextStyle(fontSize: 14.0),
+                        ),
+                        const SizedBox(height: 24.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                if (isSuccess) {
+                                  Navigator.pop(context, newAdminData);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                splashFactory: NoSplash.splashFactory,
+                                backgroundColor: headerColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                              ),
+                              child: const Text(
+                                'OK',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill out all fields.'),
-          backgroundColor: Colors.red,
-        ),
+      // Incomplete form
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: Colors.transparent,
+            contentPadding: const EdgeInsets.all(0),
+            content: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                color: Colors.white,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(height: 4, color: ilocateRed),
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.warning, color: ilocateRed, size: 32),
+                              const SizedBox(width: 8.0),
+                              Text(
+                                'INCOMPLETE FORM',
+                                style: TextStyle(
+                                  fontSize: 20.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: ilocateRed,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(color: Colors.black26),
+                          const SizedBox(height: 8.0),
+                          const Text(
+                            'Please fill out all fields.',
+                            style: TextStyle(fontSize: 14.0),
+                          ),
+                          const SizedBox(height: 24.0),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: ElevatedButton.styleFrom(
+                                  splashFactory: NoSplash.splashFactory,
+                                  backgroundColor: ilocateRed,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30.0),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'OK',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          )
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -256,7 +435,8 @@ class _z_settingsAddState extends State<z_settingsAdd> {
   }
 
   // Helper widget for text fields with validation
-  Widget _buildTextField(String label, TextEditingController controller, {bool obscureText = false, String type = 'text'}) {
+  Widget _buildTextField(String label, TextEditingController controller,
+      {bool obscureText = false, String type = 'text'}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
@@ -273,7 +453,7 @@ class _z_settingsAddState extends State<z_settingsAdd> {
           const SizedBox(height: 8.0),
           TextFormField(
             controller: controller,
-            obscureText: obscureText,
+            obscureText: type == 'password' ? _obscurePassword : obscureText,
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';
@@ -333,12 +513,26 @@ class _z_settingsAddState extends State<z_settingsAdd> {
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: ilocateRed, width: 2.0),
               ),
+              suffixIcon: type == 'password'
+                  ? IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    )
+                  : null,
             ),
           ),
         ],
       ),
     );
   }
+
 
   // Helper widget for date picker field
   Widget _buildDatePickerField(String label, DateTime? date, AdminFormData formData) {

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'a_login.dart';
 import 'a_forgot_password.dart';
-import 'g_rescuer_navigation.dart';
-import 'g_admin_navigation.dart'; // Import the new admin navigation screen
+import 'g_admin_navigation.dart'; 
+import 'database/firebase_db.dart';
 
 class UserLogin extends StatefulWidget {
   const UserLogin({super.key});
@@ -23,12 +22,6 @@ class _UserLoginState extends State<UserLogin> {
 
   bool _obscurePassword = true;
 
-  // Temporary credentials for testing
-  static const String _tempUsername = 'user';
-  static const String _tempPassword = 'password123';
-  static const String _tempAdminUsername = 'admin'; // Temporary admin username
-  static const String _tempAdminPassword = 'adminpassword'; // Temporary admin password
-
   @override
   void dispose() {
     _usernameController.dispose();
@@ -45,8 +38,8 @@ class _UserLoginState extends State<UserLogin> {
     return Colors.grey;
   }
 
-  void _showAlertDialog(String title, String message, Color headerColor, IconData icon) {
-    showDialog(
+  Future<void> _showAlertDialog(String title, String message, Color headerColor, IconData icon) {
+    return showDialog(
       context: context,
       builder: (context) {
         return Dialog(
@@ -120,36 +113,46 @@ class _UserLoginState extends State<UserLogin> {
     );
   }
 
-  void _handleLogin() {
-    final username = _usernameController.text;
+  void _handleLogin() async {
+    final username = _usernameController.text.trim();
     final password = _passwordController.text;
 
     if (username.isEmpty || password.isEmpty) {
       _showAlertDialog(
         'Missing Information',
-        'Please enter both your email/username and password to log in.',
+        'Please enter both your username and password to log in.',
         ilocateRed,
         Icons.help_outline,
       );
-    } else if (username == _tempUsername && password == _tempPassword) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+      return;
+    }
+
+    // Call Firebase service for login
+    final isLoggedIn = await DatabaseService().adminLogin(username, password);
+
+  if (isLoggedIn) {
+      await _showAlertDialog(
+        'Login Successful',
+        'Welcome, $username!',
+        Colors.green, 
+        Icons.check_circle,
       );
-    } else if (username == _tempAdminUsername && password == _tempAdminPassword) {
+      // Navigate to Admin screen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const AdminNavigationScreen()),
       );
     } else {
-      _showAlertDialog(
+      // Show error if login failed
+      await _showAlertDialog(
         'Login Failed',
-        'Incorrect email/password. Please check your credentials again.',
+        'Incorrect username/password. Please check your credentials again.',
         ilocateRed,
         Icons.cancel,
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -298,28 +301,6 @@ class _UserLoginState extends State<UserLogin> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // 📝 Create Account Prompt
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text("Don't have an account?"),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const CreateAccount(),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          'Create an account',
-                          style: TextStyle(color: Colors.blue), // Reverted to blue
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),

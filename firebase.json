@@ -1,0 +1,1 @@
+{"flutter":{"platforms":{"android":{"default":{"projectId":"fir-ttn-lorawan","appId":"1:546151450200:android:06a501b6b9f8d8190eac2d","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"fir-ttn-lorawan","configurations":{"android":"1:546151450200:android:06a501b6b9f8d8190eac2d","web":"1:546151450200:web:cbac0c160e1d20080eac2d"}}}}}}
