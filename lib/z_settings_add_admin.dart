@@ -75,6 +75,91 @@ class _z_settingsAddState extends State<z_settingsAdd> {
     super.dispose();
   }
 
+  // Reusable Show Dialog
+  void _showCustomDialog({
+    required String title,
+    required String message,
+    required Color headerColor,
+    required IconData icon,
+    bool isSuccess = false,
+  }) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: headerColor),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(icon, color: headerColor, size: 32),
+                            const SizedBox(width: 8.0),
+                            Text(
+                              title.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 20.0,
+                                fontWeight: FontWeight.bold,
+                                color: headerColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8.0),
+                        Text(
+                          message,
+                          style: const TextStyle(fontSize: 14.0),
+                        ),
+                        const SizedBox(height: 24.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                if (isSuccess) {
+                                  Navigator.pop(context, true);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                splashFactory: NoSplash.splashFactory,
+                                backgroundColor: headerColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                              ),
+                              child: const Text(
+                                'OK',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// A function to show the date picker for the form.
   void _showDatePicker(AdminFormData formData) async {
     final DateTime? picked = await showDatePicker(
@@ -109,10 +194,10 @@ class _z_settingsAddState extends State<z_settingsAdd> {
 
   // Function to handle the "DONE" button press.
   void _onDone() async {
+    // Check if the form is valid, and if date and sex are selected.
     if (_adminForm.formKey.currentState!.validate() &&
         _adminForm.selectedDate != null &&
         _adminForm.selectedSex != null) {
-
       // Loading Screen
       setState(() {
         _isLoading = true;
@@ -143,182 +228,52 @@ class _z_settingsAddState extends State<z_settingsAdd> {
       if (isSuccess) {
         title = 'Success';
         message = 'Admin registered successfully!';
+        _showCustomDialog(
+          title: title,
+          message: message,
+          headerColor: Colors.green,
+          icon: Icons.check_circle,
+          isSuccess: isSuccess,
+        );
       } else {
         title = 'Error';
         message = 'Failed to register admin. The following issues were found:\n';
         
-        if (result['username'] == true) {
-          message += '- Username already exists.\n';
-        }
-        if (result['email'] == true) {
-          message += '- Email already exists.\n';
-        }
-        if (result['phone'] == true) {
-          message += '- Phone number already exists.\n';
-        }
-        if (result['acdvId'] == true) {
-          message += '- ACDVID already exists.\n';
+        // Check for the 'duplicates' key before trying to access its values
+        if (result.containsKey('duplicates')) {
+          final duplicates = result['duplicates'] as Map<String, bool>;
+
+          if (duplicates['username'] == true) {
+            message += '- Username already exists.\n';
+          }
+          if (duplicates['email'] == true) {
+            message += '- Email already exists.\n';
+          }
+          if (duplicates['phone'] == true) {
+            message += '- Phone number already exists.\n';
+          }
+          if (duplicates['acdvId'] == true) {
+            message += '- ACDVID already exists.\n';
+          }
         }
         
-        // If none of the specific duplicates were found, add a generic message
         if (message == 'Failed to register admin. The following issues were found:\n') {
           message += '- Unknown error occurred.';
         }
-      }
 
-    // Show custom dialog
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        final Color headerColor = isSuccess ? Colors.green : ilocateRed;
-
-        return AlertDialog(
-          backgroundColor: Colors.transparent,
-          contentPadding: const EdgeInsets.all(0),
-          content: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              color: Colors.white,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(height: 4, color: headerColor),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              isSuccess ? Icons.check_circle : Icons.error,
-                              color: headerColor,
-                              size: 32,
-                            ),
-                            const SizedBox(width: 8.0),
-                            Text(
-                              title.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 20.0,
-                                fontWeight: FontWeight.bold,
-                                color: headerColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Divider(color: Colors.black26),
-                        const SizedBox(height: 8.0),
-                        Text(
-                          message,
-                          style: const TextStyle(fontSize: 14.0),
-                        ),
-                        const SizedBox(height: 24.0),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                                if (isSuccess) {
-                                  Navigator.pop(context, newAdminData);
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                splashFactory: NoSplash.splashFactory,
-                                backgroundColor: headerColor,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30.0),
-                                ),
-                              ),
-                              child: const Text(
-                                'OK',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        )
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        _showCustomDialog(
+          title: title,
+          message: message,
+          headerColor: ilocateRed,
+          icon: Icons.error,
         );
-      },
-    );
-
+      }
     } else {
-      // Incomplete form
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            backgroundColor: Colors.transparent,
-            contentPadding: const EdgeInsets.all(0),
-            content: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                color: Colors.white,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(height: 4, color: ilocateRed),
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.warning, color: ilocateRed, size: 32),
-                              const SizedBox(width: 8.0),
-                              Text(
-                                'INCOMPLETE FORM',
-                                style: TextStyle(
-                                  fontSize: 20.0,
-                                  fontWeight: FontWeight.bold,
-                                  color: ilocateRed,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Divider(color: Colors.black26),
-                          const SizedBox(height: 8.0),
-                          const Text(
-                            'Please fill out all fields.',
-                            style: TextStyle(fontSize: 14.0),
-                          ),
-                          const SizedBox(height: 24.0),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: ElevatedButton.styleFrom(
-                                  splashFactory: NoSplash.splashFactory,
-                                  backgroundColor: ilocateRed,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30.0),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'OK',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          )
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+      _showCustomDialog(
+        title: 'Incomplete Form',
+        message: 'Please fill out all fields.',
+        headerColor: ilocateRed,
+        icon: Icons.warning,
       );
     }
   }

@@ -46,7 +46,92 @@ class _z_settingsRegisterState extends State<z_settingsRegister> {
     super.dispose();
   }
 
-  /// A function to show the date picker for the form.
+    // Reusable Show Dialog
+    void _showCustomDialog({
+      required String title,
+      required String message,
+      required Color headerColor,
+      required IconData icon,
+      bool isSuccess = false,
+    }) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: Colors.transparent,
+            contentPadding: const EdgeInsets.all(0),
+            content: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                color: Colors.white,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(height: 4, color: headerColor),
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(icon, color: headerColor, size: 32),
+                              const SizedBox(width: 8.0),
+                              Text(
+                                title.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 20.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: headerColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(color: Colors.black26),
+                          const SizedBox(height: 8.0),
+                          Text(
+                            message,
+                            style: const TextStyle(fontSize: 14.0),
+                          ),
+                          const SizedBox(height: 24.0),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  if (isSuccess) {
+                                    Navigator.pop(context, true);
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  splashFactory: NoSplash.splashFactory,
+                                  backgroundColor: headerColor,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30.0),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'OK',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          )
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+  // A function to show the date picker for the form.
   void _showDatePicker(UserFormData formData) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -78,215 +163,81 @@ class _z_settingsRegisterState extends State<z_settingsRegister> {
     }
   }
 
-  // Function to handle the "REGISTER" button press.
-  void _onRegister() async {
-    if (_userForm.formKey.currentState!.validate() &&
-        _userForm.selectedDate != null &&
-        _userForm.selectedSex != null) {
+// Function to handle the "REGISTER" button press.
+void _onRegister() async {
+  if (_userForm.formKey.currentState!.validate() &&
+      _userForm.selectedDate != null &&
+      _userForm.selectedSex != null) {
+    // Show loading
+    setState(() {
+      _isLoading = true;
+    });
 
-      // Loading Screen
-      setState(() {
-        _isLoading = true;
-      });
+    final Map<String, String> newUserData = {
+      'fullname': _userForm.fullnameController.text,
+      'phone': _userForm.phoneController.text,
+      'address': _userForm.addressController.text,
+      'dateOfBirth': DateFormat('yyyy-MM-dd').format(_userForm.selectedDate!),
+      'sex': _userForm.selectedSex!,
+      'devuid': _userForm.devuidController.text,
+    };
 
-      final Map<String, String> newUserData = {
-        'fullname': _userForm.fullnameController.text,
-        'phone': _userForm.phoneController.text,
-        'address': _userForm.addressController.text,
-        'dateOfBirth': DateFormat('yyyy-MM-dd').format(_userForm.selectedDate!),
-        'sex': _userForm.selectedSex!,
-        'devuid': _userForm.devuidController.text,
-      };
+    final result = await DatabaseService().createDevice(newUserData);
 
-      final result = await DatabaseService().createDevice(newUserData);
+    setState(() {
+      _isLoading = false;
+    });
 
-       setState(() {
-        _isLoading = false;
-      });
+    bool isSuccess = result['success'] == true;
+    String title, message;
+    Color headerColor;
+    IconData icon;
 
-      String title;
-      String message;
-      bool isSuccess = result['success'] == true;
+    if (isSuccess) {
+      title = 'Success';
+      message = 'Device registered successfully!';
+      headerColor = Colors.green;
+      icon = Icons.check_circle;
 
-      if (isSuccess) {
-        title = 'Success';
-        message = 'Device registered successfully!';
-      } else {
-        title = 'Error';
-        bool hasDevuidDuplicate = result['devuid'] == true;
-        bool hasPhoneDuplicate = result['phone'] == true;
+      _showCustomDialog(
+        title: title,
+        message: message,
+        headerColor: headerColor,
+        icon: icon,
+        isSuccess: true,
+      );
+    } else {
+      title = 'Error';
+      message = 'Failed to register device. The following issues were found:\n';
 
-        if (hasDevuidDuplicate || hasPhoneDuplicate) {
-          message = 'Failed to register device. The following issues were found:\n';
-          
-          if (hasDevuidDuplicate) {
-            message += '- DEVUID already exists.\n';
-          }
-          
-          if (hasPhoneDuplicate) {
-            message += '- Phone number already exists.\n';
-          }
-        } else {
-          message = 'An unknown error occurred.';
-        }
+      if (result['devuid'] == true) {
+        message += '- DEVUID already exists.\n';
+      }
+      if (result['phone'] == true) {
+        message += '- Phone number already exists.\n';
       }
 
-    // Show custom dialog
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        final Color headerColor = isSuccess ? Colors.green : ilocateRed;
+      if (message == 'Failed to register device. The following issues were found:\n') {
+        message += '- An unknown error occurred.';
+      }
 
-        return AlertDialog(
-          backgroundColor: Colors.transparent,
-          contentPadding: const EdgeInsets.all(0),
-          content: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              color: Colors.white,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(height: 4, color: headerColor),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              isSuccess ? Icons.check_circle : Icons.error,
-                              color: headerColor,
-                              size: 32,
-                            ),
-                            const SizedBox(width: 8.0),
-                            Text(
-                              title.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 20.0,
-                                fontWeight: FontWeight.bold,
-                                color: headerColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Divider(color: Colors.black26),
-                        const SizedBox(height: 8.0),
-                        Text(
-                          message,
-                          style: const TextStyle(fontSize: 14.0),
-                        ),
-                        const SizedBox(height: 24.0),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                                if (isSuccess) {
-                                  Navigator.pop(context, newUserData);
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                splashFactory: NoSplash.splashFactory,
-                                backgroundColor: headerColor,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30.0),
-                                ),
-                              ),
-                              child: const Text(
-                                'OK',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        )
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    } else {
-      // Incomplete form
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            backgroundColor: Colors.transparent,
-            contentPadding: const EdgeInsets.all(0),
-            content: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                color: Colors.white,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(height: 4, color: ilocateRed),
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.warning, color: ilocateRed, size: 32),
-                              const SizedBox(width: 8.0),
-                              Text(
-                                'INCOMPLETE FORM',
-                                style: TextStyle(
-                                  fontSize: 20.0,
-                                  fontWeight: FontWeight.bold,
-                                  color: ilocateRed,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Divider(color: Colors.black26),
-                          const SizedBox(height: 8.0),
-                          const Text(
-                            'Please fill out all fields.',
-                            style: TextStyle(fontSize: 14.0),
-                          ),
-                          const SizedBox(height: 24.0),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: ElevatedButton.styleFrom(
-                                  splashFactory: NoSplash.splashFactory,
-                                  backgroundColor: ilocateRed,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30.0),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'OK',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          )
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+      _showCustomDialog(
+        title: title,
+        message: message,
+        headerColor: ilocateRed,
+        icon: Icons.error,
       );
     }
+  } else {
+    // Incomplete form
+    _showCustomDialog(
+      title: 'Incomplete Form',
+      message: 'Please fill out all fields.',
+      headerColor: ilocateRed,
+      icon: Icons.warning,
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {

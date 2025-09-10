@@ -1,43 +1,42 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 class z_adminDetails extends StatelessWidget {
   final Map<String, dynamic> admin;
 
   const z_adminDetails({super.key, required this.admin});
 
-  // Format Date into a readable format
-    String _formatDate(String dateString) {
-      if (dateString.isEmpty) {
-        return 'N/A';
+  // Age Calculator for Display
+  String _calculateAge(String dateString) {
+    if (dateString.isEmpty) return 'N/A';
+    try {
+      final parts = dateString.split('-');
+      if (parts.length != 3) return 'N/A';
+
+      final year = int.tryParse(parts[0]);
+      final month = int.tryParse(parts[1]);
+      final day = int.tryParse(parts[2]);
+
+      if (year == null || month == null || day == null) return 'N/A';
+
+      final today = DateTime.now();
+      final birthDate = DateTime(year, month, day);
+
+      int age = today.year - birthDate.year;
+      if (today.month < birthDate.month ||
+          (today.month == birthDate.month && today.day < birthDate.day)) {
+        age--;
       }
-      try {
-        // Parse the date string "YYYY-MM-DD"
-        final parts = dateString.split('-');
-        if (parts.length != 3) {
-          return dateString; 
-        }
 
-        final year = int.tryParse(parts[0]);
-        final month = int.tryParse(parts[1]);
-        final day = int.tryParse(parts[2]);
-
-        if (year == null || month == null || day == null) {
-          return dateString;
-        }
-
-        final dateTime = DateTime(year, month, day);
-        return DateFormat('MMMM d, yyyy').format(dateTime);
-      } catch (e) {
-        return dateString; 
-      }
+      return "$age";
+    } catch (e) {
+      return 'N/A';
     }
-
+  }
 
   @override
   Widget build(BuildContext context) {
     final Color ilocateRed = const Color(0xFFC70000);
-    final formattedDateOfBirth = _formatDate(admin['dateOfBirth'] ?? '');
+    final displayAge = _calculateAge(admin['dateOfBirth'] ?? '');
 
     return Scaffold(
       appBar: AppBar(
@@ -81,27 +80,15 @@ class z_adminDetails extends StatelessWidget {
                 ilocateRed,
               ),
               _buildDetailCard(
-                'Email',
-                admin['email'] ?? 'N/A',
-                Icons.email,
-                ilocateRed,
-              ),
-              _buildDetailCard(
-                'Phone',
-                admin['phone'] ?? 'N/A',
-                Icons.phone,
-                ilocateRed,
-              ),
-              _buildDetailCard(
                 'Address',
                 admin['address'] ?? 'N/A',
                 Icons.location_on,
                 ilocateRed,
               ),
               _buildDetailCard(
-                'Date of Birth',
-                formattedDateOfBirth,
-                Icons.cake,
+                'Age',
+                displayAge,
+                Icons.calendar_today,
                 ilocateRed,
               ),
               _buildDetailCard(

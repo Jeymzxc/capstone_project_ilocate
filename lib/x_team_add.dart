@@ -1,28 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'database/firebase_db.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 // A new class to hold the data and controllers for a single member's form.
 class MemberFormData {
   final TextEditingController fullnameController;
   final TextEditingController addressController;
   final TextEditingController acdvIdController;
-  final TextEditingController roleController;
   String? selectedSex;
   DateTime? selectedDate;
+  String? selectedRole; 
   final GlobalKey<FormState> formKey;
 
   MemberFormData()
       : fullnameController = TextEditingController(),
         addressController = TextEditingController(),
         acdvIdController = TextEditingController(),
-        roleController = TextEditingController(),
         formKey = GlobalKey<FormState>();
 
   void dispose() {
     fullnameController.dispose();
     addressController.dispose();
     acdvIdController.dispose();
-    roleController.dispose();
   }
 }
 
@@ -35,6 +35,9 @@ class x_teamAdd extends StatefulWidget {
 
 class _x_teamAddState extends State<x_teamAdd> {
   final Color ilocateRed = const Color(0xFFC70000);
+  final DatabaseService _databaseService = DatabaseService(); 
+  bool _obscurePassword = true;
+  bool _isLoading = false;
 
   // Controllers for text fields for team details
   final TextEditingController _teamNameController = TextEditingController();
@@ -49,6 +52,15 @@ class _x_teamAddState extends State<x_teamAdd> {
   // Form Key for validation of the team details section
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
+  // List of roles for the dropdown menu
+  final List<String> _roles = [
+    'Team Leader',
+    'Medic',
+    'Search and Rescue',
+    'Communications Officer',
+    'Coordinator'
+  ];
+
   @override
   void dispose() {
     _teamNameController.dispose();
@@ -60,6 +72,91 @@ class _x_teamAddState extends State<x_teamAdd> {
       formData.dispose();
     }
     super.dispose();
+  }
+
+    // Reusable Show Dialog
+  Future<void> _showCustomDialog({
+    required String title,
+    required String message,
+    required Color headerColor,
+    required IconData icon,
+    bool isSuccess = false,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: headerColor),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(icon, color: headerColor, size: 32),
+                            const SizedBox(width: 8.0),
+                            Text(
+                              title.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 20.0,
+                                fontWeight: FontWeight.bold,
+                                color: headerColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8.0),
+                        Text(
+                          message,
+                          style: const TextStyle(fontSize: 14.0),
+                        ),
+                        const SizedBox(height: 24.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                if (isSuccess) {
+                                  Navigator.pop(context, true);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                splashFactory: NoSplash.splashFactory,
+                                backgroundColor: headerColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                              ),
+                              child: const Text(
+                                'OK',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// A function to show the date picker for a specific form.
@@ -94,73 +191,145 @@ class _x_teamAddState extends State<x_teamAdd> {
     }
   }
 
-  /// Function to handle the "DONE" button press.
-  void _onDone() {
-    bool allFormsValid = true;
+    // Function to handle the "DONE" button press.
+    void _onDone() async {
+      bool allFormsValid = true;
 
-    // Validate team details form
-    if (!_formKey.currentState!.validate()) {
-      allFormsValid = false;
-    }
-
-    // Validate all member forms
-    for (var formData in _memberForms) {
-      if (!formData.formKey.currentState!.validate() ||
-          formData.selectedDate == null ||
-          formData.selectedSex == null) {
+      // Validate team details form
+      if (!_formKey.currentState!.validate()) {
         allFormsValid = false;
-        break; // Stop if any member form is incomplete
       }
-    }
 
-    if (allFormsValid) {
-      final teamDetails = {
-        'teamName': _teamNameController.text,
-        'username': _usernameController.text,
-        'email': _emailController.text,
-        'phoneNo': _phoneController.text,
-        'password': _passwordController.text,
-      };
-
-      final List<Map<String, String>> membersData = [];
+      // Validate all member forms
       for (var formData in _memberForms) {
-        membersData.add({
-          'fullname': formData.fullnameController.text,
-          'dateOfBirth': DateFormat('yyyy-MM-dd').format(formData.selectedDate!),
-          'address': formData.addressController.text,
-          'sex': formData.selectedSex!,
-          'acdvId': formData.acdvIdController.text,
-          'role': formData.roleController.text,
-        });
+        if (!formData.formKey.currentState!.validate() ||
+            formData.selectedDate == null ||
+            formData.selectedSex == null ||
+            formData.selectedRole == null) {
+          allFormsValid = false;
+          break;
+        }
       }
 
-      final newTeamData = {
-        ...teamDetails,
-        'members': membersData,
-      };
+      if (allFormsValid) {
+        final teamDetails = {
+          'teamName': _teamNameController.text.trim(),
+          'username': _usernameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'phoneNo': _phoneController.text.trim(),
+          'password': _passwordController.text.trim(),
+        };
 
-      print('New Team Data: $newTeamData');
+        final Map<String, Map<String, String>> membersData = {};
+        for (var formData in _memberForms) {
+          final newKey = FirebaseDatabase.instance.ref().child("teams/members").push().key;
+          membersData[newKey!] = {
+            'fullname': formData.fullnameController.text.trim(),
+            'dateOfBirth': DateFormat('yyyy-MM-dd').format(formData.selectedDate!),
+            'address': formData.addressController.text.trim(),
+            'sex': formData.selectedSex!,
+            'acdvId': formData.acdvIdController.text.trim(),
+            'role': formData.selectedRole!,
+          };
+        }
 
-      // Navigate back to x_Team.dart
-      Navigator.pop(context, newTeamData);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill out all the fields.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+        final newTeamData = {
+          ...teamDetails,
+          'members': membersData,
+        };
+
+          setState(() {
+          _isLoading = true;
+        });
+
+        try {
+          final response = await _databaseService.createTeam(newTeamData);
+
+          String title;
+          String message;
+          Color headerColor;
+          IconData icon;
+          bool isSuccess = response['success'] == true;
+
+          if (isSuccess) {
+            title = 'Success';
+            message = 'Team successfully registered!';
+            headerColor = Colors.green;
+            icon = Icons.check_circle;
+          } else {
+            title = 'Error';
+            message = 'Failed to register team. The following issues were found:\n';
+            
+            if (response.containsKey('duplicates')) {
+              final duplicates = response['duplicates'] as Map<String, dynamic>;
+              
+              // Correctly handle each type of duplicate
+              if (duplicates['username'] is bool && duplicates['username'] == true) {
+                message += '- Username already exists.\n';
+              }
+              if (duplicates['email'] is bool && duplicates['email'] == true) {
+                message += '- Email already exists.\n';
+              }
+              if (duplicates['phoneNo'] is bool && duplicates['phoneNo'] == true) {
+                message += '- Phone number already exists.\n';
+              }
+
+              if (duplicates.containsKey('acdvId') && duplicates['acdvId'] is List) {
+                final duplicateIds = duplicates['acdvId'] as List<dynamic>;
+                message += '- The following ACDV IDs already exist:\n';
+                for (var id in duplicateIds) {
+                  message += '  - "$id"\n';
+                }
+              }
+            }
+
+            if (message == 'Failed to register team. The following issues were found:\n') {
+              message += '- Unknown error occurred.';
+            }
+            headerColor = ilocateRed;
+            icon = Icons.error;
+          }
+            await _showCustomDialog(
+              title: title,
+              message: message,
+              headerColor: headerColor,
+              icon: icon,
+            );
+
+            if (isSuccess) {
+              if (!mounted) return;
+              Navigator.pop(context, {'success': true});
+            }
+
+        } catch (e) {
+          print('Firebase error while creating team: $e');
+          _showCustomDialog(
+            title: 'Error',
+            message: 'An unexpected error occurred. Please try again.',
+            headerColor: ilocateRed,
+            icon: Icons.error,
+          );
+        } finally {
+          setState(() => _isLoading = false);
+        }
+      } else {
+        _showCustomDialog(
+          title: 'Incomplete Form',
+          message: 'Please fill out all the fields.',
+          headerColor: ilocateRed,
+          icon: Icons.warning,
+        );
+      }
     }
-  }
 
-  /// Adds a new, empty MemberFormData object to the list.
+  // Adds a new, empty MemberFormData object to the list.
   void _addMemberForm() {
     setState(() {
       _memberForms.add(MemberFormData());
     });
   }
 
-  /// Removes a MemberFormData object from the list.
+  // Removes a MemberFormData object from the list.
   void _removeMemberForm(MemberFormData formData) {
     setState(() {
       _memberForms.remove(formData);
@@ -170,137 +339,152 @@ class _x_teamAddState extends State<x_teamAdd> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        toolbarHeight: 120.0,
-        backgroundColor: ilocateRed,
-        title: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Text(
-                'ADD RESCUE',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 26.0,
-                ),
-              ),
-              Text(
-                'TEAM',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 26.0,
-                ),
-              ),
-            ],
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 30.0),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(10),
-          ),
-        ),
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
+    // The Stack is the root widget.
+    return Stack(
+      children: [
+        // The Scaffold is the first child, forming the base UI layer.
+        Scaffold(
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            toolbarHeight: 120.0,
+            backgroundColor: ilocateRed,
+            title: Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Team Details Section
-                  const Text(
-                    'Team Details:',
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Text(
+                    'ADD',
                     style: TextStyle(
-                      fontSize: 20.0,
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      fontSize: 26.0,
                     ),
                   ),
-                  const SizedBox(height: 12.0),
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        _buildTextField('Team Name', _teamNameController),
-                        _buildTextField('Username', _usernameController, type: 'username'),
-                        _buildTextField('Email', _emailController, type: 'email'),
-                        _buildTextField('Phone No.', _phoneController, type: 'phone'),
-                        _buildTextField('Password', _passwordController, obscureText: true, type: 'password'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24.0),
-
-                  // Dynamically build a form for each member in the list.
-                  for (var i = 0; i < _memberForms.length; i++)
-                    _buildMemberForm(_memberForms[i], i),
-
-                  const SizedBox(height: 12.0),
-                  // The "Add" button now takes full width.
-                  SizedBox(
-                    width: double.infinity,
-                    child: InkWell(
-                      onTap: _addMemberForm,
-                      borderRadius: BorderRadius.circular(12.0),
-                      splashColor: Colors.grey.withOpacity(0.3),
-                      highlightColor: Colors.grey.withOpacity(0.1),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16.0),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: ilocateRed, width: 2.0),
-                          borderRadius: BorderRadius.circular(12.0),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.add_circle,
-                            color: ilocateRed,
-                            size: 24.0,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24.0),
-
-                  // DONE button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _onDone,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ilocateRed,
-                        padding: const EdgeInsets.symmetric(vertical: 16.0),
-                        // Updated to have more rounded corners
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30.0),
-                        ),
-                      ),
-                      child: const Text(
-                        'DONE',
-                        style: TextStyle(
-                          fontSize: 18.0,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                  Text(
+                    'TEAMS',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 26.0,
                     ),
                   ),
                 ],
               ),
             ),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 30.0),
+              onPressed: () => Navigator.pop(context),
+            ),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(10),
+              ),
+            ),
+          ),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Team Details:',
+                        style: TextStyle(
+                          fontSize: 20.0,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 12.0),
+                      Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            _buildTextField('Team Name', _teamNameController),
+                            _buildTextField('Username', _usernameController, type: 'username'),
+                            _buildTextField('Email', _emailController, type: 'email'),
+                            _buildTextField('Phone No.', _phoneController, type: 'phone'),
+                            _buildTextField('Password', _passwordController, obscureText: true, type: 'password'),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24.0),
+                      ListView.builder(
+                        physics: const NeverScrollableScrollPhysics(),
+                        shrinkWrap: true,
+                        itemCount: _memberForms.length,
+                        itemBuilder: (context, index) {
+                          return _buildMemberForm(_memberForms[index], index);
+                        },
+                      ),
+                      const SizedBox(height: 12.0),
+                      SizedBox(
+                        width: double.infinity,
+                        child: InkWell(
+                          onTap: _addMemberForm,
+                          borderRadius: BorderRadius.circular(12.0),
+                          splashColor: Colors.grey.withOpacity(0.3),
+                          highlightColor: Colors.grey.withOpacity(0.1),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16.0),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: ilocateRed, width: 2.0),
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                            child: Center(
+                              child: Icon(
+                                Icons.add_circle,
+                                color: ilocateRed,
+                                size: 24.0,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24.0),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _onDone,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ilocateRed,
+                            padding: const EdgeInsets.symmetric(vertical: 16.0),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30.0),
+                            ),
+                          ),
+                          child: const Text(
+                            'DONE',
+                            style: TextStyle(
+                              fontSize: 18.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-      ),
+        // The loading overlay is a separate child of the Stack,
+        // positioned on top of the Scaffold.
+        if (_isLoading)
+          Container(
+            color: Colors.black.withOpacity(0.5),
+            child: const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFC70000)),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -341,9 +525,80 @@ class _x_teamAddState extends State<x_teamAdd> {
                 _buildAddressField('Address', formData.addressController),
                 _buildRadioButtons(formData),
                 _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController),
-                _buildTextField('Role', formData.roleController),
+                _buildRoleDropdown(formData), 
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Helper widget for role dropdown
+  Widget _buildRoleDropdown(MemberFormData formData) {
+
+    // Function to disable from picking team leader twice.
+    final bool isTeamLeaderSelected = _memberForms
+      .any((member) => member.selectedRole == 'Team Leader');
+
+    final List<String> availableRoles = _roles.where((role) {
+    if (role == formData.selectedRole) {
+      return true;
+    }
+    if (isTeamLeaderSelected && role == 'Team Leader') {
+      return false;
+    }
+    return true;
+  }).toList();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Role :',
+            style: TextStyle(
+              fontSize: 16.0,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 8.0),
+          DropdownButtonFormField<String>(
+            value: formData.selectedRole,
+            onChanged: (String? newValue) {
+              setState(() {
+                formData.selectedRole = newValue;
+              });
+            },
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please select a role';
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              errorStyle: const TextStyle(color: Colors.red),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+                borderSide: BorderSide(color: ilocateRed, width: 2.0),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+                borderSide: BorderSide(color: ilocateRed, width: 2.0),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+                borderSide: BorderSide(color: ilocateRed, width: 2.0),
+              ),
+            ),
+              items: availableRoles.map((String role) {
+              return DropdownMenuItem<String>(
+                value: role,
+                child: Text(role),
+              );
+            }).toList(),
           ),
         ],
       ),
@@ -368,7 +623,8 @@ class _x_teamAddState extends State<x_teamAdd> {
           const SizedBox(height: 8.0),
           TextFormField(
             controller: controller,
-            obscureText: obscureText,
+            obscureText: type == 'password' ? _obscurePassword : obscureText,
+            maxLength: type == 'phone' ? 11 : null,
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';
@@ -416,6 +672,13 @@ class _x_teamAddState extends State<x_teamAdd> {
             },
             decoration: InputDecoration(
               errorStyle: const TextStyle(color: Colors.red),
+              helperText: type == 'password'
+                  ? 'Password must be at least 8 characters long.\nInclude uppercase, lowercase, number, and a special character. \nExample: Password#123'
+                  : null,
+              helperStyle: const TextStyle(
+                fontSize: 12.0,
+                color: Colors.grey,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: ilocateRed, width: 2.0),
@@ -428,6 +691,19 @@ class _x_teamAddState extends State<x_teamAdd> {
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: ilocateRed, width: 2.0),
               ),
+              suffixIcon: type == 'password'
+                  ? IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    )
+                  : null,
             ),
           ),
         ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'x_team_add.dart';
 import 'x_team_rescue.dart';
+import 'database/firebase_db.dart';
 
 class x_Team extends StatefulWidget {
   const x_Team({super.key});
@@ -11,112 +12,326 @@ class x_Team extends StatefulWidget {
 
 class _x_TeamState extends State<x_Team> {
   final Color ilocateRed = const Color(0xFFC70000);
+  final DatabaseService _databaseService = DatabaseService();
 
-  // A list to store the names of the rescue teams
-  List<String> _groups = ['MDRRMO_Group1', 'MDRRMO_Group2'];
+  // A Future to hold the list of teams
+   late Future<List<Map<String, dynamic>>> _teamsFuture;
+   bool _isDeleting = false;
 
-  // Function to remove a group from the list
-  void _deleteGroup(int index) {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch teams only once when the widget is created
+    _teamsFuture = _databaseService.getTeams();
+  }
+
+  // Refreshes the list of teams from the database
+  void _refreshTeams() {
     setState(() {
-      _groups.removeAt(index);
+      _teamsFuture = _databaseService.getTeams();
     });
   }
 
-  // Function to show the confirmation dialog with a more specific message
-  Future<void> _showDeleteConfirmationDialog(int index) async {
-    String groupName = _groups[index];
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false, // User must tap a button to close
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10.0),
-          ),
-          titlePadding: EdgeInsets.zero, // Remove default padding
-          title: Container(
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: ilocateRed,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(10.0),
-                topRight: Radius.circular(10.0),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.warning_rounded, color: Colors.white, size: 28),
-                SizedBox(width: 10),
-                Text(
-                  'Confirm Deletion',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20.0,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          content: Text(
-            'Are you sure you want to delete the rescue team: "$groupName"? This action cannot be undone.',
-            textAlign: TextAlign.center,
-          ),
-          actionsAlignment: MainAxisAlignment.spaceEvenly,
-          actions: <Widget>[
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: ilocateRed, width: 2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-              onPressed: () {
-                Navigator.of(context).pop(); // Dismiss the dialog
-              },
-              child: Text(
-                'No',
-                style: TextStyle(color: ilocateRed),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ilocateRed,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-              onPressed: () {
-                _deleteGroup(index); // Call the delete function
-                Navigator.of(context).pop(); // Dismiss the dialog
-              },
-              child: const Text(
-                'Yes',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Function to add a new group from the x_teamAdd form
+  // Navigates to the add team page and refreshes the list on return
   void _addNewGroup(BuildContext context) async {
     final newTeamData = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const x_teamAdd()),
     );
 
-    // If new data is returned, add the new team name to the list
-    if (newTeamData != null && newTeamData['teamName'] != null) {
-      setState(() {
-        _groups.add(newTeamData['teamName']);
-      });
+    if (newTeamData != null && 
+        newTeamData is Map && 
+        newTeamData['success'] == true) {
+      _refreshTeams();
     }
+  }
+
+  // Reusable Show Dialog
+  Future<void> _showCustomDialog({
+    required String title,
+    required String message,
+    required Color headerColor,
+    required IconData icon,
+    bool isSuccess = false,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: headerColor),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(icon, color: headerColor, size: 32),
+                            const SizedBox(width: 8.0),
+                            Text(
+                              title.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 20.0,
+                                fontWeight: FontWeight.bold,
+                                color: headerColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8.0),
+                        Text(
+                          message,
+                          style: const TextStyle(fontSize: 14.0),
+                        ),
+                        const SizedBox(height: 24.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                if (isSuccess) {
+                                  Navigator.pop(context, true);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                splashFactory: NoSplash.splashFactory,
+                                backgroundColor: headerColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                              ),
+                              child: const Text(
+                                'OK',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Show delete confirmation dialog 
+  Future<void> _showDeleteConfirmationDialog(
+      String teamId, String teamName) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          // Added: StatefulBuilder to manage deletion loader inside dialog
+          builder: (context, setStateDialog) {
+            return Stack(
+              children: [
+                AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                  titlePadding: EdgeInsets.zero,
+                  title: Container(
+                    padding: const EdgeInsets.all(16.0),
+                    decoration: BoxDecoration(
+                      color: ilocateRed,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(10.0),
+                        topRight: Radius.circular(10.0),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.warning_rounded, color: Colors.white, size: 28),
+                        SizedBox(width: 10),
+                        Text(
+                          'Confirm Deletion',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 20.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  content: Text(
+                    'Are you sure you want to delete the rescue team: "$teamName"? This action cannot be undone.',
+                    textAlign: TextAlign.center,
+                  ),
+                  actionsAlignment: MainAxisAlignment.spaceEvenly,
+                  actions: <Widget>[
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: ilocateRed, width: 2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(
+                        'No',
+                        style: TextStyle(color: ilocateRed),
+                      ),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ilocateRed,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                      onPressed: () async {
+                        setStateDialog(() => _isDeleting = true); // Added: show loader
+                        try {
+                          await _databaseService.deleteTeam(teamId);
+                          setStateDialog(() => _isDeleting = false); // Added: hide loader
+                          Navigator.of(context).pop(); // Close dialog
+                          _showCustomDialog(
+                            title: 'Success!',
+                            message: 'Successfully deleted.',
+                            headerColor: Colors.green,
+                            icon: Icons.check_circle_outline,
+                          );
+                          _refreshTeams();
+                        } catch (e) {
+                          setStateDialog(() => _isDeleting = false); // Added: hide loader
+                          Navigator.of(context).pop();
+                          _showCustomDialog(
+                            title: 'Error!',
+                            message: 'Failed to delete team. Please try again.',
+                            headerColor: Colors.red,
+                            icon: Icons.error_outline,
+                          );
+                          print('Error deleting team: $e');
+                        }
+                      },
+                      child: const Text(
+                        'Yes',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Added: red loader overlay during deletion
+                if (_isDeleting)
+                  Container(
+                    color: Colors.black54,
+                    child: Center(
+                      child: CircularProgressIndicator(color: ilocateRed),
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Builds the "Add New Group" button
+  Widget _buildAddButton() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: InkWell(
+        onTap: () => _addNewGroup(context),
+        borderRadius: BorderRadius.circular(12.0),
+        splashColor: Colors.grey.withOpacity(0.3),
+        highlightColor: Colors.grey.withOpacity(0.4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          decoration: BoxDecoration(
+            border: Border.all(color: ilocateRed, width: 2.0),
+            borderRadius: BorderRadius.circular(12.0),
+          ),
+          child: Center(
+            child: Icon(
+              Icons.add_circle,
+              color: ilocateRed,
+              size: 24.0,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Builds a single team card
+  Widget _buildTeamCard(Map<String, dynamic> team) {
+    final teamId = team['id'] as String;
+    final teamName = team['teamName'] as String;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TeamRescue(teamId: teamId, teamName: teamName), 
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12.0),
+        splashColor: Colors.grey.withOpacity(0.3),
+        highlightColor: Colors.grey.withOpacity(0.4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          decoration: BoxDecoration(
+            border: Border.all(color: ilocateRed, width: 2.0),
+            borderRadius: BorderRadius.circular(12.0),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  teamName,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 20.0,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.remove_circle,
+                    color: Color(0xFFC70000), size: 28.0),
+                onPressed: () {
+                  _showDeleteConfirmationDialog(teamId, teamName);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -165,91 +380,29 @@ class _x_TeamState extends State<x_Team> {
                 const Icon(Icons.groups, size: 80.0, color: Color(0xFFC70000)),
                 const SizedBox(height: 12.0),
                 Expanded(
-                  // Use Expanded to allow the list to fill the available space
-                  child: ListView.builder(
-                    // The item count is now one more than the number of groups
-                    itemCount: _groups.length + 1,
-                    itemBuilder: (context, index) {
-                      // Check if we are at the last item in the list
-                      if (index == _groups.length) {
-                        // This is the "add new group" button
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: InkWell(
-                            onTap: () => _addNewGroup(context),
-                            borderRadius: BorderRadius.circular(12.0),
-                            splashColor: Colors.grey.withOpacity(0.3),
-                            // Updated: Increased opacity for a more visible highlight
-                            highlightColor: Colors.grey.withOpacity(0.4),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: ilocateRed, width: 2.0),
-                                borderRadius: BorderRadius.circular(12.0),
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  Icons.add_circle,
-                                  color: ilocateRed,
-                                  size: 24.0,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      } else {
-                        // This is a regular group container
-                        String groupName = _groups[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: InkWell(
-                            // All group containers should now have a working onTap function
-                            onTap: (index == 0)
-                                ? () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => const TeamRescue()),
-                                    );
-                                  }
-                                : () {
-                                    // You can add logic for other groups here if needed
-                                    // For now, it just provides the visual highlight
-                                  },
-                            borderRadius: BorderRadius.circular(12.0),
-                            splashColor: Colors.grey.withOpacity(0.3),
-                            highlightColor: Colors.grey.withOpacity(0.4),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: ilocateRed, width: 2.0),
-                                borderRadius: BorderRadius.circular(12.0),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      groupName,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 20.0,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.remove_circle, color: Color(0xFFC70000), size: 28.0),
-                                    onPressed: () {
-                                      _showDeleteConfirmationDialog(index);
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
+                  child: FutureBuilder<List<Map<String, dynamic>>>(
+                    future: _teamsFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator(color: Color(0xFFC70000)));
                       }
+
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      }
+
+                      final teams = snapshot.data ?? [];
+
+                      return ListView.builder(
+                        itemCount: teams.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == teams.length) {
+                            return _buildAddButton();
+                          } else {
+                            return _buildTeamCard(teams[index]);
+                          }
+                        },
+                      );
                     },
                   ),
                 ),

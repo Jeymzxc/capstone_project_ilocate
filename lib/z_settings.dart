@@ -4,6 +4,8 @@ import 'z_change_password.dart';
 import 'z_terms_n_conditions.dart';
 import 'z_privacy_policy.dart';
 import 'z_manage_users.dart'; 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'database/firebase_db.dart';
 
 class z_Settings extends StatefulWidget {
   const z_Settings({super.key});
@@ -14,6 +16,51 @@ class z_Settings extends StatefulWidget {
 
 class _z_SettingsState extends State<z_Settings> {
   final Color ilocateRed = const Color(0xFFC70000);
+
+  String? _email;
+  String? _phone;
+  bool _isLoading = true;
+
+  final DatabaseService _dbService = DatabaseService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdminInfo();
+  }
+
+  Future<void> _loadAdminInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    final adminId = prefs.getString('adminId');
+
+    if (adminId != null) {
+      try {
+        final admins = await _dbService.getAdmins();
+        final admin = admins.firstWhere((a) => a['id'] == adminId, orElse: () => {});
+        if (admin.isNotEmpty) {
+          setState(() {
+            _email = _maskEmail(admin['email'] ?? '');
+            _phone = _maskPhone(admin['phone'] ?? '');
+          });
+        }
+      } catch (e) {
+        print('Error loading admin info: $e');
+      }
+    }
+
+    setState(() => _isLoading = false);
+  }
+
+  String _maskEmail(String email) {
+    int atIndex = email.indexOf('@');
+    if (atIndex <= 2) return email;
+    return email.substring(0, 2) + "****" + email.substring(atIndex - 1);
+  }
+
+  String _maskPhone(String phone) {
+    if (phone.length < 6) return phone;
+    return phone.substring(0, 4) + "******" + phone.substring(phone.length - 2);
+  }
 
   void _showLogoutConfirmationDialog(BuildContext context) {
     showDialog(
@@ -231,13 +278,17 @@ class _z_SettingsState extends State<z_Settings> {
                 buildSectionTitle('Account Information'),
                 buildItemWithValue(
                   label: 'Phone number',
-                  value: '+63928******23',
+                  value: _isLoading
+                      ? 'Loading...'
+                      : (_phone ?? 'Not set'),
                   icon: Icons.phone,
                   context: context,
                 ),
                 buildItemWithValue(
                   label: 'Email',
-                  value: 'ma****23@gmail.com',
+                  value: _isLoading
+                      ? 'Loading...'
+                      : (_email ?? 'Not set'),
                   icon: Icons.email,
                   context: context,
                 ),

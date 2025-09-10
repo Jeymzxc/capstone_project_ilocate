@@ -19,10 +19,215 @@ class DatabaseService {
     });
   }
 
+  // Check for a unique ACDV ID across both admins and rescuers.
+  Future<bool> _isAcdvIdUnique(String acdvId) async {
+    try {
+      // Check 'admins' database for duplicate ACDV ID
+      Query adminQuery = _db.child('admins').orderByChild('acdvId').equalTo(acdvId);
+      DatabaseEvent adminEvent = await adminQuery.once();
+      if (adminEvent.snapshot.value != null) {
+        return false; // ACDV ID found in admins
+      }
+
+      // Check 'teams' database for members' ACDV ID
+      DatabaseEvent teamsEvent = await _db.child('teams').once();
+      if (teamsEvent.snapshot.value != null) {
+        final teamsMap = Map<String, dynamic>.from(teamsEvent.snapshot.value as Map);
+        for (var teamData in teamsMap.values) {
+          if (teamData is Map && teamData.containsKey('members')) {
+            final membersMap = Map<String, dynamic>.from(teamData['members'] as Map);
+            for (var memberData in membersMap.values) {
+              if (memberData is Map && memberData['acdvId'] == acdvId) {
+                return false; // ACDV ID found in a team member
+              }
+            }
+          }
+        }
+      }
+
+      return true; // ACDV ID is unique
+    } catch (e) {
+      print('Firebase error while checking ACDV ID uniqueness: $e');
+      return false; // Assume not unique on error
+    }
+  }
+
+
+
+
+    // --- Team Management Functions ---
+  
+  // Checks for Duplicate Data
+  Future<Map<String, dynamic>> _checkTeamDuplicates(Map<String, dynamic> teamData) async {
+    Map<String, dynamic> duplicates = {
+      'username': false,
+      'email': false,
+      'phoneNo': false,
+      'acdvId': false,
+    };
+
+    try {
+        // Run all 3 queries in parallel instead of one by one
+        final results = await Future.wait([
+          _db.child('teams').orderByChild('username').equalTo(teamData['username']).once(),
+          _db.child('teams').orderByChild('email').equalTo(teamData['email']).once(),
+          _db.child('teams').orderByChild('phoneNo').equalTo(teamData['phoneNo']).once(),
+        ]);
+
+        // Extract results
+        final usernameEvent = results[0];
+        final emailEvent = results[1];
+        final phoneEvent = results[2];
+
+        if (usernameEvent.snapshot.value != null) {
+          duplicates['username'] = true;
+        }
+        if (emailEvent.snapshot.value != null) {
+          duplicates['email'] = true;
+        }
+        if (phoneEvent.snapshot.value != null) {
+          duplicates['phoneNo'] = true;
+        }
+
+        return duplicates;
+      } catch (e) {
+        print('Firebase error while checking for team duplicates: $e');
+        return duplicates;
+      }
+    }
+
+  // Creates New Team
+  Future<Map<String, dynamic>> createTeam(Map<String, dynamic> teamData) async {
+    try {
+      Map<String, dynamic> duplicates = await _checkTeamDuplicates(teamData);
+      
+      // Create a list to store all duplicate ACDV IDs found
+      List<String> duplicateAcdvIds = [];
+
+      final membersData = teamData['members'] as Map<String, dynamic>;
+      for (var memberData in membersData.values) {
+        final isUnique = await _isAcdvIdUnique(memberData['acdvId']);
+        if (!isUnique) {
+          duplicateAcdvIds.add(memberData['acdvId']);
+        }
+      }
+      
+      // Add the list of duplicate ACDV IDs to the duplicates map
+      if (duplicateAcdvIds.isNotEmpty) {
+        duplicates['acdvId'] = duplicateAcdvIds;
+      }
+
+      if (duplicates.containsValue(true) || duplicateAcdvIds.isNotEmpty) {
+        return {'success': false, 'duplicates': duplicates};
+      }
+
+      // Hash the password before saving
+      final hashedPassword = BCrypt.hashpw(teamData['password'], BCrypt.gensalt());
+      teamData['password'] = hashedPassword;
+
+      await _db.child('teams').push().set(teamData);
+      print('Team created successfully');
+      return {'success': true};
+    } catch (e) {
+      print('Firebase error while creating team: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+    // Adds a new member to a specific team.
+    Future<Map<String, dynamic>> addTeamMember(String teamId, Map<String, dynamic> memberData) async {
+      try {
+        final isUnique = await _isAcdvIdUnique(memberData['acdvId']);
+        if (!isUnique) {
+          return {'success': false, 'message': 'ACDV ID already exists.'};
+      }
+
+        await _db.child('teams').child(teamId).child('members').push().set(memberData);
+        print('Member added to team $teamId successfully');
+        return {'success': true};
+      } catch (e) {
+        print('Firebase error adding team member: $e');
+        return {'success': false};
+      }
+    }
+
+    // Display Team Name
+    Future<List<Map<String, dynamic>>> getTeams() async {
+      try {
+        DatabaseEvent event = await _db.child('teams').once();
+        if (event.snapshot.value == null) {
+          return [];
+        }
+        final Map<String, dynamic> teamsMap = Map<String, dynamic>.from(event.snapshot.value as Map);
+        
+        List<Map<String, dynamic>> teamsList = [];
+        teamsMap.forEach((key, value) {
+          final teamData = Map<String, dynamic>.from(value as Map);
+          teamData['id'] = key;
+          teamsList.add(teamData);
+        });
+        return teamsList;
+      } catch (e) {
+        print('Firebase error fetching teams: $e');
+        return [];
+      }
+    }
+
+  Future<List<Map<String, dynamic>>> getTeamMembers(String teamId) async {
+    try {
+      DatabaseEvent event = await _db.child('teams/$teamId/members').once();
+      if (event.snapshot.value == null) return [];
+
+      final membersMap = Map<String, dynamic>.from(event.snapshot.value as Map);
+
+      List<Map<String, dynamic>> membersList = [];
+      membersMap.forEach((key, value) {
+        final memberData = Map<String, dynamic>.from(value as Map);
+        memberData['id'] = key;
+        membersList.add(memberData);
+      });
+
+      return membersList; 
+    } catch (e) {
+      print('Error fetching members: $e');
+      return [];
+    }
+  }
+
+
+  // Deletes a specific member from a team.
+  Future<void> deleteTeamMember(String teamId, String memberId) async {
+    try {
+      // Navigate to the correct path 'teams/[teamId]/members/[memberId]' and remove the data.
+      await _db.child('teams').child(teamId).child('members').child(memberId).remove();
+      print('Member $memberId deleted from team $teamId successfully');
+    } catch (e) {
+      print('Firebase error deleting team member: $e');
+    }
+  }
+    
+  // Deletes entire team.
+  Future<void> deleteTeam(String teamId) async {
+    try {
+      await _db.child('teams').child(teamId).remove();
+      print('Team with ID $teamId deleted successfully');
+    } catch (e) {
+      print('Firebase error deleting team: $e');
+    }
+  }
+
+
+
+
+
+
+
+ // --- Admin Management Function ---
+
   // Change admin password
   Future<bool> changePassword(String adminId, String oldPassword, String newPassword) async {
     try {
-      // Step 1: Fetch the current admin data by their ID
+      // Fetch the current admin data by their ID
       DatabaseEvent event = await _db.child('admins').child(adminId).once();
 
       if (event.snapshot.value == null) {
@@ -33,13 +238,13 @@ class DatabaseService {
       final adminData = Map<String, dynamic>.from(event.snapshot.value as Map);
       final storedPassword = adminData['password'];
 
-      // Step 2: Verify the old password
+      // Verify the old password
       if (!BCrypt.checkpw(oldPassword, storedPassword)) {
         print('Incorrect old password');
         return false;
       }
 
-      // Step 3: Hash the new password and update the database
+      // Hash the new password and update the database
       final hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
       await _db.child('admins').child(adminId).update({'password': hashedPassword});
 
@@ -117,9 +322,8 @@ class DatabaseService {
       }
 
       // Check for acdvId duplicate
-      Query acdvIdQuery = _db.child('admins').orderByChild('acdvId').equalTo(adminData['acdvId']);
-      DatabaseEvent acdvIdEvent = await acdvIdQuery.once();
-      if (acdvIdEvent.snapshot.value != null) {
+      bool isUnique = await _isAcdvIdUnique(adminData['acdvId']);
+      if (!isUnique) {
         duplicates['acdvId'] = true;
       }
 
@@ -135,7 +339,7 @@ class DatabaseService {
     try {
       Map<String, bool> duplicates = await _checkDuplicates(adminData);
       if (duplicates.containsValue(true)) {
-        return duplicates;
+        return {'success': false, 'duplicates': duplicates};
       }
       final hashedPassword = BCrypt.hashpw(adminData['password'], BCrypt.gensalt());
       adminData['password'] = hashedPassword;
