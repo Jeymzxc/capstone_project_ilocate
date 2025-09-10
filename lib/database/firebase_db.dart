@@ -19,6 +19,150 @@ class DatabaseService {
     });
   }
 
+
+  // --- Duplicate Management Functions ---
+
+  // Checks for Duplicate Data across all Users (TEAMS SIDE)
+  Future<Map<String, dynamic>> _checkTeamDuplicates(Map<String, dynamic> teamData) async {
+    Map<String, dynamic> duplicates = {
+      'username': false,
+      'email': false,
+      'phone': false,
+      'acdvId': false,
+    };
+
+    try {
+        final username = teamData['username'];
+        final email = teamData['email'];
+        final phone = teamData['phoneNo']; 
+
+        // Check for username and email duplicates across admins and teams in parallel
+        final results = await Future.wait([
+          _db.child('admins').orderByChild('username').equalTo(username).once(),
+          _db.child('teams').orderByChild('username').equalTo(username).once(),
+          _db.child('admins').orderByChild('email').equalTo(email).once(),
+          _db.child('teams').orderByChild('email').equalTo(email).once(),
+          _db.child('admins').orderByChild('phone').equalTo(phone).once(),
+          _db.child('teams').orderByChild('phoneNo').equalTo(phone).once(), 
+          _db.child('devices').orderByChild('phone').equalTo(phone).once(),
+        ]);
+
+        // Check results for duplicates
+          final usernameAdminEvent = results[0];
+          final usernameTeamEvent = results[1];
+          final emailAdminEvent = results[2];
+          final emailTeamEvent = results[3];
+          final phoneAdminEvent = results[4];
+          final phoneTeamEvent = results[5];
+          final phoneDeviceEvent = results[6];
+
+          if (usernameAdminEvent.snapshot.value != null || usernameTeamEvent.snapshot.value != null) {
+            duplicates['username'] = true;
+          }
+          if (emailAdminEvent.snapshot.value != null || emailTeamEvent.snapshot.value != null) {
+            duplicates['email'] = true;
+          }
+          if (phoneAdminEvent.snapshot.value != null || phoneTeamEvent.snapshot.value != null || phoneDeviceEvent.snapshot.value != null) {
+            duplicates['phone'] = true;
+          }
+
+          return duplicates;
+        } catch (e) {
+          print('Firebase error while checking for team duplicates: $e');
+          return duplicates;
+        }
+      }
+
+  // Checks for Duplicates Data Across all Users (ADMIN SIDE)
+  Future<Map<String, bool>> _checkDuplicates(Map<String, dynamic> adminData) async {
+    Map<String, bool> duplicates = {
+      'username': false,
+      'email': false,
+      'phone': false,
+      'acdvId': false,
+    };
+
+    try {
+      final username = adminData['username'];
+      final email = adminData['email'];
+      final phone = adminData['phone'];
+      final acdvId = adminData['acdvId'];
+
+      // Use Future.wait to check all uniqueness constraints in parallel for efficiency
+      final results = await Future.wait([
+        _db.child('admins').orderByChild('username').equalTo(username).once(),
+        _db.child('teams').orderByChild('username').equalTo(username).once(),
+        _db.child('admins').orderByChild('email').equalTo(email).once(),
+        _db.child('teams').orderByChild('email').equalTo(email).once(),
+        _db.child('admins').orderByChild('phone').equalTo(phone).once(),
+        _db.child('teams').orderByChild('phoneNo').equalTo(phone).once(),
+        _db.child('devices').orderByChild('phone').equalTo(phone).once(),
+        _isAcdvIdUnique(acdvId),
+      ]);
+
+      // Explicitly cast the first six results to DatabaseEvent
+      final usernameAdminEvent = results[0] as DatabaseEvent;
+      final usernameTeamEvent = results[1] as DatabaseEvent;
+      final emailAdminEvent = results[2] as DatabaseEvent;
+      final emailTeamEvent = results[3] as DatabaseEvent;
+      final phoneAdminEvent = results[4] as DatabaseEvent;
+      final phoneTeamEvent = results[5] as DatabaseEvent;
+      final phoneDeviceEvent = results[6] as DatabaseEvent;
+      final isAcdvIdUniqueResult = results[7] as bool;
+
+      if (usernameAdminEvent.snapshot.value != null || usernameTeamEvent.snapshot.value != null) {
+        duplicates['username'] = true;
+      }
+      if (emailAdminEvent.snapshot.value != null || emailTeamEvent.snapshot.value != null) {
+        duplicates['email'] = true;
+      }
+      if (phoneAdminEvent.snapshot.value != null || phoneTeamEvent.snapshot.value != null || phoneDeviceEvent.snapshot.value != null) {
+        duplicates['phone'] = true;
+      }
+
+      if (isAcdvIdUniqueResult == false) {
+        duplicates['acdvId'] = true;
+      }
+
+      return duplicates;
+    } catch (e) {
+      print('Firebase error while checking for duplicates: $e');
+      return duplicates;
+    }
+  }
+
+    // Check for duplicate phone and devUid (DEVICES SIDE)
+  Future<Map<String, bool>> _checkDeviceDuplicates(Map<String, dynamic> deviceData) async {
+    Map<String, bool> duplicates = {
+      'phone': false,
+      'devuid': false,
+    };
+
+    try {
+      final phone = deviceData['phone'];
+      final devuid = deviceData['devuid'];
+
+      final results = await Future.wait([
+        _db.child('admins').orderByChild('phone').equalTo(phone).once(),
+        _db.child('teams').orderByChild('phoneNo').equalTo(phone).once(),
+        _db.child('devices').orderByChild('phone').equalTo(phone).once(),
+        _db.child('devices').orderByChild('devuid').equalTo(devuid).once(),
+      ]);
+
+      if (results[0].snapshot.value != null || results[1].snapshot.value != null || results[2].snapshot.value != null) {
+        duplicates['phone'] = true;
+      }
+      if (results[3].snapshot.value != null) {
+        duplicates['devuid'] = true;
+      }
+
+      return duplicates;
+    } catch (e) {
+      print('Firebase error while checking for device duplicates: $e');
+      return duplicates;
+    }
+  }
+
   // Check for a unique ACDV ID across both admins and rescuers.
   Future<bool> _isAcdvIdUnique(String acdvId) async {
     try {
@@ -55,46 +199,8 @@ class DatabaseService {
 
 
 
+
     // --- Team Management Functions ---
-  
-  // Checks for Duplicate Data
-  Future<Map<String, dynamic>> _checkTeamDuplicates(Map<String, dynamic> teamData) async {
-    Map<String, dynamic> duplicates = {
-      'username': false,
-      'email': false,
-      'phoneNo': false,
-      'acdvId': false,
-    };
-
-    try {
-        // Run all 3 queries in parallel instead of one by one
-        final results = await Future.wait([
-          _db.child('teams').orderByChild('username').equalTo(teamData['username']).once(),
-          _db.child('teams').orderByChild('email').equalTo(teamData['email']).once(),
-          _db.child('teams').orderByChild('phoneNo').equalTo(teamData['phoneNo']).once(),
-        ]);
-
-        // Extract results
-        final usernameEvent = results[0];
-        final emailEvent = results[1];
-        final phoneEvent = results[2];
-
-        if (usernameEvent.snapshot.value != null) {
-          duplicates['username'] = true;
-        }
-        if (emailEvent.snapshot.value != null) {
-          duplicates['email'] = true;
-        }
-        if (phoneEvent.snapshot.value != null) {
-          duplicates['phoneNo'] = true;
-        }
-
-        return duplicates;
-      } catch (e) {
-        print('Firebase error while checking for team duplicates: $e');
-        return duplicates;
-      }
-    }
 
   // Creates New Team
   Future<Map<String, dynamic>> createTeam(Map<String, dynamic> teamData) async {
@@ -290,49 +396,6 @@ class DatabaseService {
     }
   }
 
-  // Check for duplicate data 
-  Future<Map<String, bool>> _checkDuplicates(Map<String, dynamic> adminData) async {
-    Map<String, bool> duplicates = {
-      'username': false,
-      'email': false,
-      'phone': false,
-      'acdvId': false,
-    };
-
-    try {
-      // Check for username duplicate
-      Query usernameQuery = _db.child('admins').orderByChild('username').equalTo(adminData['username']);
-      DatabaseEvent usernameEvent = await usernameQuery.once();
-      if (usernameEvent.snapshot.value != null) {
-        duplicates['username'] = true;
-      }
-
-      // Check for email duplicate
-      Query emailQuery = _db.child('admins').orderByChild('email').equalTo(adminData['email']);
-      DatabaseEvent emailEvent = await emailQuery.once();
-      if (emailEvent.snapshot.value != null) {
-        duplicates['email'] = true;
-      }
-      
-      // Check for phone duplicate
-      Query phoneQuery = _db.child('admins').orderByChild('phone').equalTo(adminData['phone']);
-      DatabaseEvent phoneEvent = await phoneQuery.once();
-      if (phoneEvent.snapshot.value != null) {
-        duplicates['phone'] = true;
-      }
-
-      // Check for acdvId duplicate
-      bool isUnique = await _isAcdvIdUnique(adminData['acdvId']);
-      if (!isUnique) {
-        duplicates['acdvId'] = true;
-      }
-
-      return duplicates;
-    } catch (e) {
-      print('Firebase error while checking for duplicates: $e');
-      return duplicates; // Return an empty map for no duplicates on error
-    }
-  }
 
   // Register Admin
   Future<Map<String, dynamic>> createAdmin(Map<String, dynamic> adminData) async {
@@ -383,33 +446,6 @@ class DatabaseService {
       print('Admin with ID $adminId deleted successfully');
     } catch (e) {
       print('Firebase error deleting admin: $e');
-    }
-  }
-
-  // Check for duplicate phone and devUid
-  Future<Map<String, bool>> _checkDeviceDuplicates(Map<String, dynamic> deviceData) async {
-    Map<String, bool> duplicates = {
-      'phone': false,
-      'devuid': false,
-    };
-
-    try {
-      // List of fields to check
-      final fieldsToCheck = ['phone', 'devuid'];
-
-      for (String field in fieldsToCheck) {
-        Query query = _db.child('devices').orderByChild(field).equalTo(deviceData[field]);
-        DatabaseEvent event = await query.once();
-
-        if (event.snapshot.value != null) {
-          duplicates[field] = true;
-        }
-      }
-
-      return duplicates;
-    } catch (e) {
-      print('Firebase error while checking for device duplicates: $e');
-      return duplicates; 
     }
   }
 
