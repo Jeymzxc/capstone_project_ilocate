@@ -59,13 +59,19 @@ class _x_teamMemberState extends State<x_teamMember> {
     super.dispose();
   }
 
-  /// A function to show the date picker for a specific form.
   void _showDatePicker(MemberFormData formData) async {
+    // Calculate the maximum allowed birth date (18 years ago from today)
+    final DateTime eighteenYearsAgo = DateTime(
+      DateTime.now().year - 18,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: formData.selectedDate ?? DateTime.now(),
+      initialDate: formData.selectedDate ?? eighteenYearsAgo, 
       firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
+      lastDate: eighteenYearsAgo, 
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -573,13 +579,28 @@ class _x_teamMemberState extends State<x_teamMember> {
                   !RegExp(r"^(09|\+639)\d{9}$").hasMatch(value)) {
                 return 'Please enter a valid Philippine phone number (e.g., 09xxxxxxxxx)';
               }
-              if (type == 'password' &&
-                  (value.length < 8 ||
-                      !value.contains(RegExp(r'[A-Z]')) ||
-                      !value.contains(RegExp(r'[a-z]')) ||
-                      !value.contains(RegExp(r'[0-9]')) ||
-                      !value.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]')))) {
-                return 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.';
+              if (type == 'password') {
+                List<String> errors = [];
+
+                if (value.length < 8) {
+                  errors.add('at least 8 characters long');
+                }
+                if (!value.contains(RegExp(r'[A-Z]'))) {
+                  errors.add('at least one uppercase letter');
+                }
+                if (!value.contains(RegExp(r'[a-z]'))) {
+                  errors.add('at least one lowercase letter');
+                }
+                if (!value.contains(RegExp(r'[0-9]'))) {
+                  errors.add('at least one number');
+                }
+                if (!value.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
+                  errors.add('at least one special character');
+                }
+
+                if (errors.isNotEmpty) {
+                  return 'Password must contain:\n- ${errors.join('\n- ')}';
+                }
               }
               if (type == 'fullname' &&
                   (!value.contains(' ') || value.trim().split(' ').length < 2)) {

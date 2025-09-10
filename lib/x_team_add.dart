@@ -159,13 +159,19 @@ class _x_teamAddState extends State<x_teamAdd> {
     );
   }
 
-  /// A function to show the date picker for a specific form.
   void _showDatePicker(MemberFormData formData) async {
+    // Calculate the maximum allowed birth date (18 years ago from today)
+    final DateTime eighteenYearsAgo = DateTime(
+      DateTime.now().year - 18,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: formData.selectedDate ?? DateTime.now(),
+      initialDate: formData.selectedDate ?? eighteenYearsAgo, 
       firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
+      lastDate: eighteenYearsAgo, 
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(

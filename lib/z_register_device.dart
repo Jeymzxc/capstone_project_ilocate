@@ -133,11 +133,17 @@ class _z_settingsRegisterState extends State<z_settingsRegister> {
 
   // A function to show the date picker for the form.
   void _showDatePicker(UserFormData formData) async {
+    final DateTime twelveYearsAgo = DateTime(
+      DateTime.now().year - 12,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: formData.selectedDate ?? DateTime.now(),
+      initialDate: formData.selectedDate ?? twelveYearsAgo, 
       firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
+      lastDate: twelveYearsAgo, 
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
