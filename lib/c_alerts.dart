@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'c_alerts_view.dart';
 import 'c_alerts_respond.dart';
-import 'c_alert_details.dart';
+import 'models/alert.dart';
 
 class Alerts extends StatefulWidget {
   final int selectedIndex;
@@ -24,6 +24,7 @@ class _AlertsState extends State<Alerts> {
       time: '5:30 AM',
       location: 'Lat 13.9563, Long 100.2018',
       heartRate: '90 BPM',
+      deviceId: '',
     ),
     Alert(
       rescueeName: 'Bill Amor',
@@ -32,6 +33,7 @@ class _AlertsState extends State<Alerts> {
       time: '5:40 AM',
       location: 'Lat 13.9563, Long 100.2018',
       heartRate: '80 BPM',
+      deviceId: '',
     ),
   ];
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'c_alert_details.dart';
+import 'models/alert.dart';
 
 class AlertsView extends StatelessWidget {
   final Alert alert;

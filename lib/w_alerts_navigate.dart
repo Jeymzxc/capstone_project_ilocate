@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'c_alert_details.dart';
+import 'models/alert.dart';
 import 'g_admin_navigation.dart';
 
 class w_alertsNavigate extends StatelessWidget {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'c_alert_details.dart';
+import 'models/alert.dart';
 import 'g_admin_navigation.dart';
 import 'w_alerts_confirm.dart';
 
@@ -63,12 +63,11 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
         child: AppBar(
           backgroundColor: ilocateRed,
           leadingWidth: 56,
-          leading: Padding(
-            padding: const EdgeInsets.only(left: 16.0, top: 32.0),
-            child: GestureDetector(
-              onTap: _onCancel,
-              child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 24),
-            ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
           ),
           flexibleSpace: Align(
             alignment: Alignment.bottomLeft,

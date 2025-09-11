@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'c_alerts_respond.dart';
-import 'c_alert_details.dart';
+import 'models/alert.dart';
 import 'c_confirm_respond.dart';
 
 class IncidentRespond extends StatefulWidget {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'w_alerts_navigate.dart';
-import 'c_alert_details.dart';
+import 'models/alert.dart';
 
 class wAlertsConfirm extends StatelessWidget {
   // The key change: We now accept the full Alert object.

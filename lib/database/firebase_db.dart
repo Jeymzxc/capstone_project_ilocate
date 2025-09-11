@@ -5,22 +5,112 @@ import 'package:bcrypt/bcrypt.dart';
 class DatabaseService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
 
-  // Read TTN device data by DEVEUI
-  Future<void> readTTNData(String deveui) async {
-    DatabaseReference dbRef = _db.child("devices/$deveui");
 
-    dbRef.onValue.listen((event) {
+// --- DEVICE DATA MANAGEMENT FUNCTIONS ---
+
+  // Function to stream real-time data for a specific device.
+  Stream<Map<String, dynamic>?> streamDeviceData(String deveui) {
+      DatabaseReference dbRef = _db.child("ttnData");
+      
+      return dbRef.orderByChild("device").equalTo(deveui).onValue.map((event) {
+        final data = event.snapshot.value;
+        if (data != null && data is Map<Object?, Object?>) {
+          final deviceData = Map<String, dynamic>.from(data.values.first as Map);
+          return deviceData;
+        }
+        return null;
+      });
+    }
+
+  // Function to stream latest distress alerts (one per device)
+  Stream<List<Map<String, dynamic>>> streamTtnDistressData() {
+    return _db.child('ttnData').onValue.map((event) {
       final data = event.snapshot.value;
-      if (data != null) {
-        print("Data for $deveui: $data");
-      } else {
-        print("No data found for $deveui");
-      }
+      if (data == null) return [];
+
+      final Map<String, dynamic> devicesMap = Map<String, dynamic>.from(data as Map);
+      Map<String, Map<String, dynamic>> latestByDevice = {};
+
+      devicesMap.forEach((deviceId, alerts) {
+        final Map<String, dynamic> alertsMap = Map<String, dynamic>.from(alerts as Map);
+
+        alertsMap.forEach((alertId, alertData) {
+          final alert = Map<String, dynamic>.from(alertData as Map);
+
+          if (alert['value']?['distress'] == true) {
+            alert['id'] = alertId;
+            alert['deviceId'] = deviceId;
+
+            final int timestamp = (alert['timestamp'] is int)
+                ? alert['timestamp']
+                : int.tryParse(alert['timestamp'].toString()) ?? 0;
+
+            if (!latestByDevice.containsKey(deviceId) ||
+                timestamp < (latestByDevice[deviceId]?['timestamp'] ?? 0)) {
+              latestByDevice[deviceId] = alert;
+            }
+          }
+        });
+      });
+
+      return latestByDevice.values.toList();
     });
   }
 
+  // Fetch the latest alert for a specific device 
+  Future<Map<String, dynamic>?> getLatestDeviceData(String deviceId) async {
+    final ref = FirebaseDatabase.instance.ref('ttnData/$deviceId');
 
-  // --- Duplicate Management Functions ---
+    final snapshot = await ref.get();
+    if (!snapshot.exists) return null;
+
+    final alertsMap = Map<String, dynamic>.from(snapshot.value as Map);
+    Map<String, dynamic>? latestAlert;
+    int latestTimestamp = 0;
+
+    alertsMap.forEach((alertId, alertData) {
+      final alert = Map<String, dynamic>.from(alertData as Map);
+      final timestamp = (alert['timestamp'] is int)
+          ? alert['timestamp'] as int
+          : int.tryParse(alert['timestamp'].toString()) ?? 0;
+
+      // Keep the alert with the largest timestamp (latest)
+      if (timestamp > latestTimestamp) {
+        latestTimestamp = timestamp;
+        alert['id'] = alertId;
+        alert['deviceId'] = deviceId;
+        latestAlert = alert;
+      }
+    });
+
+    return latestAlert;
+  }
+
+
+  // Function to Fetch device info by devuid (e.g Personal Details of User.)
+  Future<Map<String, dynamic>?> getDeviceInfoByDevuid(String devuid) async {
+    try {
+      final query = _db.child('devices').orderByChild('devuid').equalTo(devuid);
+      final event = await query.once();
+      final snapshot = event.snapshot;
+      if (snapshot.value != null) {
+        final devicesMap = Map<String, dynamic>.from(snapshot.value as Map);
+        final deviceId = devicesMap.keys.first;
+        final deviceData = Map<String, dynamic>.from(devicesMap[deviceId] as Map);
+        return deviceData;
+      }
+      return null;
+    } catch (e) {
+      print("Error fetching device info: $e");
+      return null;
+    }
+  }
+
+
+
+
+
+  // --- DUPLICATE MANAGEMENT FUNCTIONS ---
 
   // Checks for Duplicate Data across all Users (TEAMS SIDE)
   Future<Map<String, dynamic>> _checkTeamDuplicates(Map<String, dynamic> teamData) async {
@@ -200,7 +290,7 @@ class DatabaseService {
 
 
 
-    // --- Team Management Functions ---
+    // --- TEAM MANAGEMENT FUNCTION ---
 
   // Creates New Team
   Future<Map<String, dynamic>> createTeam(Map<String, dynamic> teamData) async {
@@ -328,7 +418,7 @@ class DatabaseService {
 
 
 
- // --- Admin Management Function ---
+ // --- ADMIN MANAGEMENT FUNCTION ---
 
   // Change admin password
   Future<bool> changePassword(String adminId, String oldPassword, String newPassword) async {

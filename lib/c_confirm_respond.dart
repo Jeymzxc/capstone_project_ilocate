@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'c_mark_resolved.dart';
-import 'c_alert_details.dart';
+import 'models/alert.dart';
 
 class ConfirmedRespond extends StatelessWidget {
   final String incidentId;
@@ -121,6 +121,7 @@ class ConfirmedRespond extends StatelessWidget {
                         time: '12:00 PM',
                         location: '123 Main St',
                         heartRate: '95 bpm',
+                        deviceId: '',
                       );
 
                       Navigator.pushReplacement(
