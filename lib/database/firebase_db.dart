@@ -347,6 +347,28 @@ class DatabaseService {
       }
     }
 
+  // Gets Specific Team Name only
+  Future<List<String>> getTeamNames() async {
+    try {
+      DatabaseEvent event = await _db.child('teams').once();
+      if (event.snapshot.value == null) {
+        return [];
+      }
+      final Map<dynamic, dynamic> teamsMap = Map<dynamic, dynamic>.from(event.snapshot.value as Map);
+      
+      List<String> teamNames = [];
+      teamsMap.forEach((key, value) {
+        final teamData = Map<dynamic, dynamic>.from(value as Map);
+        // Only extract the teamName
+        teamNames.add(teamData['teamName'] as String);
+      });
+      return teamNames;
+    } catch (e) {
+      print('Firebase error fetching team names: $e');
+      return [];
+    }
+  }
+
     // Display Team Name
     Future<List<Map<String, dynamic>>> getTeams() async {
       try {
@@ -369,6 +391,7 @@ class DatabaseService {
       }
     }
 
+  // Display Team Members
   Future<List<Map<String, dynamic>>> getTeamMembers(String teamId) async {
     try {
       DatabaseEvent event = await _db.child('teams/$teamId/members').once();
@@ -412,6 +435,39 @@ class DatabaseService {
     }
   }
 
+  // Change team password
+  Future<bool> changeTeamPassword(String teamId, String oldPassword, String newPassword) async {
+    try {
+      // Fetch the current team data by their ID
+      DatabaseEvent event = await _db.child('teams').child(teamId).once();
+
+      if (event.snapshot.value == null) {
+        print('Team not found');
+        return false;
+      }
+
+      final teamData = Map<String, dynamic>.from(event.snapshot.value as Map);
+      final storedPassword = teamData['password'];
+
+      // Verify the old password
+      if (!BCrypt.checkpw(oldPassword, storedPassword)) {
+        print('Incorrect old password');
+        return false;
+      }
+
+      // Hash the new password and update the database
+      final hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+      await _db.child('teams').child(teamId).update({'password': hashedPassword});
+
+      print('Password changed successfully for team ID: $teamId');
+      return true;
+    } catch (e) {
+      print('Firebase error changing team password: $e');
+      return false;
+    }
+  }
+
+
 
 
 
@@ -452,39 +508,7 @@ class DatabaseService {
     }
   }
 
-  // Admin login
-  Future<bool> adminLogin(String username, String password) async {
-    try {
-      Query query = _db.child('admins').orderByChild('username').equalTo(username);
-      DatabaseEvent event = await query.once();
 
-      if (event.snapshot.value != null) {
-        final admins = Map<String, dynamic>.from(event.snapshot.value as Map);
-        final adminId = admins.keys.first;
-        final adminData = admins.values.first; // There should only be one result
-
-        final storedPassword = adminData['password'];
-        if (BCrypt.checkpw(password, storedPassword)) {
-          print('Admin login successful');
-
-          // Store the admin ID locally
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('adminId', adminId);
-
-          return true;
-        } else {
-          print('Password incorrect');
-          return false;
-        }
-      }
-
-      print('Admin not found');
-      return false;
-    } catch (e) {
-      print('Firebase error: $e');
-      return false;
-    }
-  }
 
 
   // Register Admin
@@ -594,4 +618,51 @@ class DatabaseService {
       print('Firebase error deleting device: $e');
     }
   }
+
+
+
+   // --- LOGIN MANAGEMENT FUNCTION ---
+
+  // Login for both Rescuer and Admin
+  Future<Map<String, dynamic>> loginUser(String type, String username, String password) async {
+    try {
+      // type: 'teams' or 'admins'
+      DatabaseEvent event = await _db.child(type).orderByChild('username').equalTo(username).once();
+
+      if (event.snapshot.value == null) {
+        return {'success': false, 'message': 'Invalid username or password.'};
+      }
+
+      final userMap = Map<dynamic, dynamic>.from(event.snapshot.value as Map);
+      final userId = userMap.keys.first;
+      final userData = Map<String, dynamic>.from(userMap[userId] as Map);
+
+      final storedHashedPassword = userData['password'];
+
+      if (BCrypt.checkpw(password, storedHashedPassword)) {
+        // Store ID in SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('${type}Id', userId);
+
+          // Build response
+        final response = {
+          'success': true,
+          'id': userId,
+          'username': userData['username'],
+        };
+
+        if (type == 'teams') {
+          response['teamName'] = userData['teamName'];
+        }
+
+        return response;
+      } else {
+        return {'success': false, 'message': 'Invalid username or password.'};
+      }
+    } catch (e) {
+      print('Error during $type login: $e');
+      return {'success': false, 'message': 'An unexpected error occurred.'};
+    }
+  }
+
 }

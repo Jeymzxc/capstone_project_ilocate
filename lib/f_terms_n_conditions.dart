@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'g_rescuer_navigation.dart';
+
 
 class TermsAndConditions extends StatelessWidget {
   const TermsAndConditions({super.key});
@@ -180,10 +180,7 @@ class TermsAndConditions extends StatelessWidget {
                       ),
                     ),
                     onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const MainNavigationScreen(initialIndex: 4)),
-                      );
+                      Navigator.pop(context);
                     },
                     child: const Text(
                       'I AGREE',

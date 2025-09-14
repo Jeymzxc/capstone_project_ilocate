@@ -17,9 +17,6 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late int _selectedIndex;
 
-  // The list of pages that the bottom navigation bar will display.
-  // CRITICAL FIX: Make this a variable, not a getter, to prevent
-  // the pages from being recreated on every rebuild.
   late final List<Widget> _widgetOptions;
 
   @override

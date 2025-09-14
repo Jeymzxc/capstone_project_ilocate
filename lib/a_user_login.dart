@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'a_forgot_password.dart';
 import 'g_admin_navigation.dart'; 
+import 'g_rescuer_navigation.dart';
 import 'database/firebase_db.dart';
 
 class UserLogin extends StatefulWidget {
@@ -128,40 +129,59 @@ class _UserLoginState extends State<UserLogin> {
       return;
     }
 
-    // Set loading state to true
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Call Firebase service for login
-      final isLoggedIn = await DatabaseService().adminLogin(username, password);
+      // First try Admin login
+      final adminResult = await DatabaseService().loginUser('admins', username, password);
 
-      if (isLoggedIn) {
+      if (adminResult['success']) {
         await _showAlertDialog(
           'Login Successful',
-          'Welcome, $username!',
+          'Welcome, ${adminResult['username']}! You are logged in as an admin.',
           Colors.green,
           Icons.check_circle,
         );
-        // Navigate to Admin screen
         if (mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const AdminNavigationScreen()),
           );
         }
-      } else {
-        // Show error if login failed
-        await _showAlertDialog(
-          'Login Failed',
-          'Incorrect username/password. Please check your credentials again.',
-          ilocateRed,
-          Icons.cancel,
-        );
+        return;
       }
+
+      // If not admin, try Team login
+      final teamResult = await DatabaseService().loginUser('teams', username, password);
+
+      if (teamResult['success']) {
+        await _showAlertDialog(
+          'Login Successful',
+          'Welcome, ${teamResult['teamName']}! You are logged in as a rescuer.',
+          Colors.green,
+          Icons.check_circle,
+        );
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+          );
+        }
+        return;
+      }
+
+      // If both fail
+      await _showAlertDialog(
+        'Login Failed',
+        'Incorrect username/password. Please check your credentials again.',
+        ilocateRed,
+        Icons.cancel,
+      );
+
     } finally {
-      // Set loading state to false regardless of the login result
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -232,6 +252,7 @@ class _UserLoginState extends State<UserLogin> {
                         SizedBox(
                           height: 60, 
                           child: TextField(
+                            cursorColor: Colors.black87,
                             controller: _usernameController,
                             focusNode: _usernameFocus,
                             decoration: InputDecoration(
@@ -254,6 +275,7 @@ class _UserLoginState extends State<UserLogin> {
                         SizedBox(
                           height: 60, 
                           child: TextField(
+                            cursorColor: Colors.black87,
                             controller: _passwordController,
                             focusNode: _passwordFocus,
                             obscureText: _obscurePassword,

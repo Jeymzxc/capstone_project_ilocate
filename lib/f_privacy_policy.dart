@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'g_rescuer_navigation.dart';
 
 class PrivacyPolicy extends StatelessWidget {
   const PrivacyPolicy({super.key});
@@ -141,10 +140,7 @@ class PrivacyPolicy extends StatelessWidget {
                     ),
                     onPressed: () {
                       // Navigate back to the Settings page with the navigation bar
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const MainNavigationScreen(initialIndex: 4)),
-                      );
+                      Navigator.pop(context);
                     },
                     child: const Text(
                       'I UNDERSTAND',
