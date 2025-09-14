@@ -119,6 +119,34 @@ class _AlertsViewState extends State<AlertsView> {
     }
   }
 
+  // Age Calculator for Display
+  String _calculateAge(String dateString) {
+    if (dateString.isEmpty) return 'N/A';
+    try {
+      final parts = dateString.split('-');
+      if (parts.length != 3) return 'N/A';
+
+      final year = int.tryParse(parts[0]);
+      final month = int.tryParse(parts[1]);
+      final day = int.tryParse(parts[2]);
+
+      if (year == null || month == null || day == null) return 'N/A';
+
+      final today = DateTime.now();
+      final birthDate = DateTime(year, month, day);
+
+      int age = today.year - birthDate.year;
+      if (today.month < birthDate.month ||
+          (today.month == birthDate.month && today.day < birthDate.day)) {
+        age--;
+      }
+
+      return "$age";
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
   /// Helper widget to build a key-value pair row.
   Widget _buildDetailRow(String label, String value) {
     return Padding(
@@ -232,7 +260,7 @@ class _AlertsViewState extends State<AlertsView> {
                                             _buildDetailRow('Rescuee Name', _fullName ?? _currentAlert.rescueeName),
                                             _buildDetailRow('Phone', _phone ?? 'N/A'),
                                             _buildDetailRow('Address', _address ?? 'N/A'),
-                                            _buildDetailRow('Date of Birth', _dateOfBirth ?? 'N/A'),
+                                            _buildDetailRow('AGE', _dateOfBirth != null ? _calculateAge(_dateOfBirth!) : 'N/A'),
                                             _buildDetailRow('Sex', _sex ?? 'N/A'),
                                             const SizedBox(height: 16.0),
                                             // Alert Details Section

@@ -29,11 +29,11 @@ class _wAlertsState extends State<wAlerts> {
       await _updateAlertsList(alertsData);
     } catch (e) {
       print('Error fetching initial data: $e');
-    } finally {
+    } 
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
-    }
   }
 
   Future<void> _updateAlertsList(List<Map<String, dynamic>> alertsData) async {
@@ -70,6 +70,8 @@ class _wAlertsState extends State<wAlerts> {
         heartRate: '$heartRate BPM',
       ));
     }
+
+    if (!mounted) return;
     setState(() {
       _alerts = newAlerts;
     });

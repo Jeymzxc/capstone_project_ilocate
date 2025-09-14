@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'database/firebase_db.dart';
+import 'package:flutter/services.dart';
 
 // A new class to hold the data and controllers for a single member's form.
 class AdminFormData {
@@ -408,7 +409,7 @@ class _z_settingsAddState extends State<z_settingsAdd> {
                 _buildTextField('Phone No.', formData.phoneController, type: 'phone'),
                 _buildTextField('Password', formData.passwordController, obscureText: true, type: 'password'),
                 _buildRadioButtons(formData),
-                _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController),
+                _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController, type: 'acdvId'),
                 _buildDatePickerField('Date of Birth', formData.selectedDate, formData),
                 _buildAddressField('Address', formData.addressController),
               ],
@@ -437,9 +438,29 @@ class _z_settingsAddState extends State<z_settingsAdd> {
           ),
           const SizedBox(height: 8.0),
           TextFormField(
+            cursorColor: Colors.black87,
             controller: controller,
             obscureText: type == 'password' ? _obscurePassword : obscureText,
-            maxLength: type == 'phone' ? 11 : null,
+            keyboardType: type == 'phone' ? TextInputType.phone : TextInputType.text,
+            inputFormatters: type == 'phone' ? [FilteringTextInputFormatter.digitsOnly] : [],
+            maxLength: () {
+              switch (type) {
+                case 'phone':
+                  return 11; 
+                case 'password':
+                  return 20; 
+                case 'fullname':
+                  return 50; 
+                case 'username':
+                  return 15; 
+                case 'email':
+                  return 100;
+                case 'acdvId':
+                  return 16;
+                default:
+                  return null; 
+              }
+            }(),
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';
@@ -484,6 +505,7 @@ class _z_settingsAddState extends State<z_settingsAdd> {
                   return 'Password must contain:\n- ${errors.join('\n- ')}';
                 }
               }
+              
               if (type == 'fullname') {
                 if (!value.contains(' ') || value.trim().split(' ').length < 2) {
                   return 'Please enter your full name (at least two words)';
@@ -493,6 +515,7 @@ class _z_settingsAddState extends State<z_settingsAdd> {
             },
             decoration: InputDecoration(
               errorStyle: const TextStyle(color: Colors.red),
+              counterText: '',
               helperText: type == 'password'
                   ? 'Password must be at least 8 characters long.\nInclude uppercase, lowercase, number, and a special character. \nExample: Password#123'
                   : null,
@@ -675,7 +698,9 @@ class _z_settingsAddState extends State<z_settingsAdd> {
           const SizedBox(height: 8.0),
           TextFormField(
             controller: controller,
+            cursorColor: Colors.black87,
             maxLines: 4,
+            maxLength: 150,
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';
@@ -684,6 +709,7 @@ class _z_settingsAddState extends State<z_settingsAdd> {
             },
             decoration: InputDecoration(
               errorStyle: const TextStyle(color: Colors.red),
+              counterText: '',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: ilocateRed, width: 2.0),

@@ -9,6 +9,8 @@ class Alert {
   final String time;
   final String location;
   final String heartRate;
+  final bool isAcknowledged;
+  final String? assignedTeam;
 
   Alert({
     required this.rescueeName,
@@ -18,6 +20,8 @@ class Alert {
     required this.time,
     required this.location,
     required this.heartRate,
+    this.isAcknowledged = false,
+    this.assignedTeam,
   }) : incidentId = _sanitizeIncidentId(incidentId);
 
   /// A factory constructor to create an Alert object from a generic Map (like from Realtime Database).
@@ -30,6 +34,8 @@ class Alert {
       time: map['time'] ?? '',
       location: map['location'] ?? '',
       heartRate: map['heartRate'] ?? '',
+      isAcknowledged: map['isAcknowledged'] ?? false,
+      assignedTeam: map['assignedTeam'] as String?,
     );
   }
 
@@ -43,6 +49,8 @@ class Alert {
       'time': time,
       'location': location,
       'heartRate': heartRate,
+      'isAcknowledged': isAcknowledged,
+      'assignedTeam': assignedTeam,
     };
   }
 

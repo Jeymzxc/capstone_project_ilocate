@@ -396,8 +396,20 @@ void _onRegister() async {
           const SizedBox(height: 8.0),
           TextFormField(
             controller: controller,
+            cursorColor: Colors.black87,
             obscureText: obscureText,
-            maxLength: type == 'phone' ? 11 : (type == 'devuid' ? 16 : null),
+            maxLength: () {
+              switch (type) {
+                case 'phone':
+                  return 11; 
+                case 'fullname':
+                  return 50; 
+                case 'devuid':
+                  return 16; 
+                default:
+                  return null; 
+              }
+            }(),
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';
@@ -422,6 +434,7 @@ void _onRegister() async {
             },
             decoration: InputDecoration(
               errorStyle: const TextStyle(color: Colors.red),
+              counterText: '',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: ilocateRed, width: 2.0),
@@ -583,7 +596,9 @@ void _onRegister() async {
           const SizedBox(height: 8.0),
           TextFormField(
             controller: controller,
+            cursorColor: Colors.black87,
             maxLines: 4,
+            maxLength: 150,
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';
@@ -592,6 +607,7 @@ void _onRegister() async {
             },
             decoration: InputDecoration(
               errorStyle: const TextStyle(color: Colors.red),
+              counterText: '',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: ilocateRed, width: 2.0),

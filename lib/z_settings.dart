@@ -31,13 +31,14 @@ class _z_SettingsState extends State<z_Settings> {
 
   Future<void> _loadAdminInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final adminId = prefs.getString('adminId');
+    final adminId = prefs.getString('adminsId');
 
     if (adminId != null) {
       try {
         final admins = await _dbService.getAdmins();
         final admin = admins.firstWhere((a) => a['id'] == adminId, orElse: () => {});
         if (admin.isNotEmpty) {
+          if (!mounted) return;   
           setState(() {
             _email = _maskEmail(admin['email'] ?? '');
             _phone = _maskPhone(admin['phone'] ?? '');
@@ -48,18 +49,19 @@ class _z_SettingsState extends State<z_Settings> {
       }
     }
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 
   String _maskEmail(String email) {
     int atIndex = email.indexOf('@');
     if (atIndex <= 2) return email;
-    return email.substring(0, 2) + "****" + email.substring(atIndex - 1);
+    return "${email.substring(0, 2)}****${email.substring(atIndex - 1)}";
   }
 
   String _maskPhone(String phone) {
     if (phone.length < 6) return phone;
-    return phone.substring(0, 4) + "******" + phone.substring(phone.length - 2);
+    return "${phone.substring(0, 4)}******${phone.substring(phone.length - 2)}";
   }
 
   void _showLogoutConfirmationDialog(BuildContext context) {

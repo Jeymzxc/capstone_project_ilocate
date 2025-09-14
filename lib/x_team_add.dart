@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'database/firebase_db.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/services.dart';
 
 // A new class to hold the data and controllers for a single member's form.
 class MemberFormData {
@@ -409,7 +410,7 @@ class _x_teamAddState extends State<x_teamAdd> {
                         key: _formKey,
                         child: Column(
                           children: [
-                            _buildTextField('Team Name', _teamNameController),
+                            _buildTextField('Team Name', _teamNameController, type: 'teamName'),
                             _buildTextField('Username', _usernameController, type: 'username'),
                             _buildTextField('Email', _emailController, type: 'email'),
                             _buildTextField('Phone No.', _phoneController, type: 'phone'),
@@ -530,7 +531,7 @@ class _x_teamAddState extends State<x_teamAdd> {
                 _buildDatePickerField('Date of Birth', formData.selectedDate, formData),
                 _buildAddressField('Address', formData.addressController),
                 _buildRadioButtons(formData),
-                _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController),
+                _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController, type: 'acdvId'),
                 _buildRoleDropdown(formData), 
               ],
             ),
@@ -629,8 +630,30 @@ class _x_teamAddState extends State<x_teamAdd> {
           const SizedBox(height: 8.0),
           TextFormField(
             controller: controller,
+            cursorColor: Colors.black87,
             obscureText: type == 'password' ? _obscurePassword : obscureText,
-            maxLength: type == 'phone' ? 11 : null,
+            keyboardType: type == 'phone' ? TextInputType.phone : TextInputType.text,
+            inputFormatters: type == 'phone' ? [FilteringTextInputFormatter.digitsOnly] : [],
+            maxLength: () {
+              switch (type) {
+                case 'phone':
+                  return 11; 
+                case 'password':
+                  return 20; 
+                case 'teamName':
+                  return 40; 
+                case 'username':
+                  return 15; 
+                case 'email':
+                  return 100;
+                case 'fullname':
+                  return 50;
+                case 'acdvId':
+                  return 16;
+                default:
+                  return null; 
+              }
+            }(),
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';
@@ -678,6 +701,7 @@ class _x_teamAddState extends State<x_teamAdd> {
             },
             decoration: InputDecoration(
               errorStyle: const TextStyle(color: Colors.red),
+              counterText: '',
               helperText: type == 'password'
                   ? 'Password must be at least 8 characters long.\nInclude uppercase, lowercase, number, and a special character. \nExample: Password#123'
                   : null,
@@ -859,7 +883,9 @@ class _x_teamAddState extends State<x_teamAdd> {
           const SizedBox(height: 8.0),
           TextFormField(
             controller: controller,
+            cursorColor: Colors.black87,
             maxLines: 4,
+            maxLength: 150,
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';
@@ -868,6 +894,7 @@ class _x_teamAddState extends State<x_teamAdd> {
             },
             decoration: InputDecoration(
               errorStyle: const TextStyle(color: Colors.red),
+              counterText: '',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: ilocateRed, width: 2.0),

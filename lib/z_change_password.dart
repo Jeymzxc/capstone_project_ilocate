@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'database/firebase_db.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'a_user_login.dart';
 
 class SettingsPassword extends StatefulWidget {
   const SettingsPassword({super.key});
@@ -130,6 +131,17 @@ class _SettingsPasswordState extends State<SettingsPassword> {
       );
       return;
     }
+
+    // Prevent using the same password as the current one
+    if (_currentPasswordController.text == _newPasswordController.text) {
+      _showAlertDialog(
+        'Invalid Password',
+        'The new password cannot be the same as the current password. Please choose a different one.',
+        ilocateRed,
+      );
+      return;
+    }
+
     
     // Set loading state to true and show a loading indicator if desired
     setState(() {
@@ -139,7 +151,7 @@ class _SettingsPasswordState extends State<SettingsPassword> {
     try {
       // Get the admin ID from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      final String? adminId = prefs.getString('adminId');
+      final String? adminId = prefs.getString('adminsId');
 
       if (adminId == null) {
         _showAlertDialog(
@@ -159,18 +171,29 @@ class _SettingsPasswordState extends State<SettingsPassword> {
       if (success) {
         _showAlertDialog(
           'Success',
-          'Password successfully changed!',
+          'Password successfully changed! Please log in again.',
           Colors.green,
-          onOk: () {
-            // After success, navigate back
-            Navigator.pop(context);
+          onOk: () async {
+            // Clear stored session
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.clear();
+
+            // Navigate to login screen and clear backstack
+            if (mounted) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const UserLogin()),
+                (route) => false,
+              );
+            }
           },
         );
-        // Clear text fields after successful change
+
+        // Clear text fields
         _currentPasswordController.clear();
         _newPasswordController.clear();
         _verifyPasswordController.clear();
-      } else {
+      }  else {
         // Handle failure (e.g., incorrect old password)
         _showAlertDialog(
           'Failed to Change Password',
@@ -300,12 +323,22 @@ class _SettingsPasswordState extends State<SettingsPassword> {
 
                                 // Current Password Textbox
                                 TextFormField(
+                                  cursorColor: Colors.black87,
                                   controller: _currentPasswordController,
                                   obscureText: !_isCurrentPasswordVisible,
+                                  maxLength: 20,
                                   decoration: InputDecoration(
                                     labelText: 'Current Password',
+                                    counterText: '',
+                                    floatingLabelStyle: const TextStyle(
+                                      color: Color(0xFFC70000), 
+                                    ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(30.0),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(30.0),
+                                      borderSide: const BorderSide(color: Color(0xFFC70000), width: 2.0),
                                     ),
                                     contentPadding: const EdgeInsets.symmetric(
                                         horizontal: 20.0, vertical: 15.0),
@@ -332,12 +365,22 @@ class _SettingsPasswordState extends State<SettingsPassword> {
 
                                 // New Password Textbox
                                 TextFormField(
+                                  cursorColor: Colors.black87,
                                   controller: _newPasswordController,
                                   obscureText: !_isNewPasswordVisible,
+                                  maxLength: 20,
                                   decoration: InputDecoration(
                                     labelText: 'New Password',
+                                    counterText: '',
+                                    floatingLabelStyle: const TextStyle(
+                                      color: Color(0xFFC70000), 
+                                    ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(30.0),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(30.0),
+                                      borderSide: const BorderSide(color: Color(0xFFC70000), width: 2.0),
                                     ),
                                     contentPadding: const EdgeInsets.symmetric(
                                         horizontal: 20.0, vertical: 15.0),
@@ -378,12 +421,22 @@ class _SettingsPasswordState extends State<SettingsPassword> {
 
                                 // Verify Password Textbox
                                 TextFormField(
+                                  cursorColor: Colors.black87,
                                   controller: _verifyPasswordController,
                                   obscureText: !_isVerifyPasswordVisible,
+                                  maxLength: 20,
                                   decoration: InputDecoration(
                                     labelText: 'Verify Password',
+                                    counterText: '',
+                                    floatingLabelStyle: const TextStyle(
+                                      color: Color(0xFFC70000), 
+                                    ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(30.0),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(30.0),
+                                      borderSide: const BorderSide(color: Color(0xFFC70000), width: 2.0),
                                     ),
                                     contentPadding: const EdgeInsets.symmetric(
                                         horizontal: 20.0, vertical: 15.0),

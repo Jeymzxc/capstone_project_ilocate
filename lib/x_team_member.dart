@@ -458,15 +458,11 @@ class _x_teamMemberState extends State<x_teamMember> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildTextField('Fullname', formData.fullnameController,
-                    type: 'fullname'),
-                _buildDatePickerField(
-                    'Date of Birth', formData.selectedDate, formData),
+                _buildTextField('Fullname', formData.fullnameController, type: 'fullname'),
+                _buildDatePickerField('Date of Birth', formData.selectedDate, formData),
                 _buildAddressField('Address', formData.addressController),
                 _buildRadioButtons(formData),
-                _buildTextField(
-                    'Accredited Community Disaster Volunteer (ACDV) ID Number',
-                    formData.acdvIdController),
+                _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController, type: 'acdvId'),
                 _buildRoleDropdown(formData),
               ],
             ),
@@ -562,45 +558,21 @@ class _x_teamMemberState extends State<x_teamMember> {
           const SizedBox(height: 8.0),
           TextFormField(
             controller: controller,
+            cursorColor: Colors.black87,
             obscureText: obscureText,
+            maxLength: () {
+              switch (type) {
+                case 'fullname':
+                  return 50;
+                case 'acdvId':
+                  return 16;
+                default:
+                  return null; 
+              }
+            }(),
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';
-              }
-              if (type == 'username' &&
-                  (value.contains(' ') || value.length < 4)) {
-                return 'Username must be at least 4 characters and contain no spaces';
-              }
-              if (type == 'email' &&
-                  !RegExp(r"^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(value)) {
-                return 'Please enter a valid email format';
-              }
-              if (type == 'phone' &&
-                  !RegExp(r"^(09|\+639)\d{9}$").hasMatch(value)) {
-                return 'Please enter a valid Philippine phone number (e.g., 09xxxxxxxxx)';
-              }
-              if (type == 'password') {
-                List<String> errors = [];
-
-                if (value.length < 8) {
-                  errors.add('at least 8 characters long');
-                }
-                if (!value.contains(RegExp(r'[A-Z]'))) {
-                  errors.add('at least one uppercase letter');
-                }
-                if (!value.contains(RegExp(r'[a-z]'))) {
-                  errors.add('at least one lowercase letter');
-                }
-                if (!value.contains(RegExp(r'[0-9]'))) {
-                  errors.add('at least one number');
-                }
-                if (!value.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
-                  errors.add('at least one special character');
-                }
-
-                if (errors.isNotEmpty) {
-                  return 'Password must contain:\n- ${errors.join('\n- ')}';
-                }
               }
               if (type == 'fullname' &&
                   (!value.contains(' ') || value.trim().split(' ').length < 2)) {
@@ -610,6 +582,7 @@ class _x_teamMemberState extends State<x_teamMember> {
             },
             decoration: InputDecoration(
               errorStyle: const TextStyle(color: Colors.red),
+              counterText: '',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: ilocateRed, width: 2.0),
@@ -769,7 +742,9 @@ class _x_teamMemberState extends State<x_teamMember> {
           const SizedBox(height: 8.0),
           TextFormField(
             controller: controller,
+            cursorColor: Colors.black87,
             maxLines: 4,
+            maxLength: 150,
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'This field cannot be empty';
@@ -778,6 +753,7 @@ class _x_teamMemberState extends State<x_teamMember> {
             },
             decoration: InputDecoration(
               errorStyle: const TextStyle(color: Colors.red),
+              counterText: '',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: ilocateRed, width: 2.0),
