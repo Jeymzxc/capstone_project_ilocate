@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'w_alerts_navigate.dart';
+import 'package:ilocate/g_admin_navigation.dart';
 import 'models/alert.dart';
 
 class wAlertsConfirm extends StatelessWidget {
-  // The key change: We now accept the full Alert object.
   final Alert alert;
 
   const wAlertsConfirm({super.key, required this.alert});
@@ -100,7 +99,7 @@ class wAlertsConfirm extends StatelessWidget {
                 ),
                 const SizedBox(height: 8.0),
                 const Text(
-                  'Check Incident log to update the',
+                  'Check Incident log to view the',
                   style: TextStyle(
                     fontSize: 14.0,
                     color: Colors.black,
@@ -108,7 +107,7 @@ class wAlertsConfirm extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const Text(
-                  'state of the incident.',
+                  'status of the incident.',
                   style: TextStyle(
                     fontSize: 14.0,
                     color: Colors.black,
@@ -120,11 +119,10 @@ class wAlertsConfirm extends StatelessWidget {
                   width: 250,
                   child: ElevatedButton(
                     onPressed: () {
-                      // We now pass the entire Alert object that was received.
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => w_alertsNavigate(alert: alert),
+                          builder:  (context) => const AdminNavigationScreen(selectedIndex: 3),
                         ),
                       );
                     },

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'x_team_member.dart';
 import 'database/firebase_db.dart';
 
-// The widget now still requires teamId (you said you'll pass it when navigating here)
 class TeamRescue extends StatefulWidget {
   final String teamId;
   final String teamName;
@@ -388,9 +387,11 @@ class _TeamRescueState extends State<TeamRescue> {
                                       child: Text(
                                         displayName,
                                         style: const TextStyle(
-                                          fontSize: 18.0,
+                                          fontSize: 16.0,
                                           fontWeight: FontWeight.bold,
                                         ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     Row(
@@ -399,9 +400,11 @@ class _TeamRescueState extends State<TeamRescue> {
                                           displayRole,
                                           textAlign: TextAlign.right,
                                           style: const TextStyle(
-                                            fontSize: 16.0,
+                                            fontSize: 14.0,
                                             color: Colors.grey,
                                           ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                         const SizedBox(width: 8.0),
                                         IconButton(

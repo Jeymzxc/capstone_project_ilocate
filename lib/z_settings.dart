@@ -97,14 +97,17 @@ class _z_SettingsState extends State<z_Settings> {
                               size: 32,
                             ),
                             const SizedBox(width: 8.0),
-                            Text(
-                              'LOGOUT CONFIRMATION',
-                              style: TextStyle(
-                                fontSize: 20.0,
-                                fontWeight: FontWeight.bold,
-                                color: ilocateRed,
+                            Expanded( 
+                              child: Text(
+                                'LOGOUT CONFIRMATION',
+                                style: TextStyle(
+                                  fontSize: 16.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: ilocateRed,
+                                ),
+                                overflow: TextOverflow.ellipsis, 
                               ),
-                            ),
+                            )
                           ],
                         ),
                         const Divider(color: Colors.black26),

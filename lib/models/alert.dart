@@ -14,7 +14,7 @@ class Alert {
 
   Alert({
     required this.rescueeName,
-    required String incidentId,
+    required this. incidentId,
     required this.deviceId,
     required this.date,
     required this.time,
@@ -22,7 +22,7 @@ class Alert {
     required this.heartRate,
     this.isAcknowledged = false,
     this.assignedTeam,
-  }) : incidentId = _sanitizeIncidentId(incidentId);
+  });
 
   /// A factory constructor to create an Alert object from a generic Map (like from Realtime Database).
   factory Alert.fromMap(Map<dynamic, dynamic> map) {
@@ -54,10 +54,4 @@ class Alert {
     };
   }
 
-  /// A static method to sanitize the incident ID by converting it to uppercase
-  /// and removing all characters that are not letters or numbers.
-  static String _sanitizeIncidentId(String input) {
-    final sanitized = input.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
-    return sanitized;
-  }
 }

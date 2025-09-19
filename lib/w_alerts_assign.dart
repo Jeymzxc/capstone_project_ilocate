@@ -22,7 +22,6 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
   // List of possible groups to assign the incident to
   List<String> _groupOptions = [];
 
-  String? _fullName;
   String? _phone;
   String? _address;
   String? _dateOfBirth;
@@ -63,7 +62,6 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
       final userDetails = await _db.getDeviceInfoByDevuid(widget.alert.deviceId);
       if (userDetails != null) {
         setState(() {
-          _fullName = userDetails['fullname'];
           _phone = userDetails['phone'];
           _address = userDetails['address'];
           _dateOfBirth = userDetails['dateOfBirth'];
@@ -105,21 +103,49 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
   }
 
   // Function to handle the "Confirm" button click and navigate to w_alertsConfirm.dart
-  void _onConfirm() {
-    // Check if a group has been selected before navigating
+  void _onConfirm() async {
     if (_selectedGroup != null) {
-      debugPrint("Assigning incident to group: $_selectedGroup");
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          // The key change is here: we now pass the entire `Alert` object.
-          builder: (context) => wAlertsConfirm(alert: widget.alert),
-        ),
-      );
+      // Show the status update confirmation dialog first
+      _showStatusUpdateDialog(
+        selectedTeam: _selectedGroup!,
+        onConfirm: () async {
+        setState(() => _isLoading = true);
+        try {
+          await _db.changeIncidentStatus(
+            widget.alert.incidentId,
+            'assigned',
+            assignedTeam: _selectedGroup,
+          );
+
+          if (!mounted) return;
+
+          // Navigate to confirmation page after successful update
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => wAlertsConfirm(alert: widget.alert),
+            ),
+          );
+        } catch (e) {
+          print('Error assigning incident: $e');
+          _showCustomDialog(
+            title: 'Error',
+            message: 'Failed to assign incident.',
+            headerColor: ilocateRed,
+            icon: Icons.error_outline_rounded,
+          );
+        } finally {
+          setState(() => _isLoading = false);
+        }
+      });
     } else {
-      // You could show a message to the user that they need to select a group
-      // For now, we'll just print a debug message
-      debugPrint("No group selected. Cannot confirm.");
+      // Show custom dialog if no group is selected
+      _showCustomDialog(
+        title: 'Warning',
+        message: 'Please select a group to assign.',
+        headerColor: ilocateRed,
+        icon: Icons.warning_rounded,
+      );
     }
   }
 
@@ -132,6 +158,193 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
       ),
     );
   }
+
+  // Reusable Show Dialog
+  void _showCustomDialog({
+    required String title,
+    required String message,
+    required Color headerColor,
+    required IconData icon,
+    bool isSuccess = false,
+  }) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: headerColor),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(icon, color: headerColor, size: 32),
+                            const SizedBox(width: 8.0),
+                            Text(
+                              title.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 20.0,
+                                fontWeight: FontWeight.bold,
+                                color: headerColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8.0),
+                        Text(
+                          message,
+                          style: const TextStyle(fontSize: 14.0),
+                        ),
+                        const SizedBox(height: 24.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                if (isSuccess) {
+                                  Navigator.pop(context, true);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                splashFactory: NoSplash.splashFactory,
+                                backgroundColor: headerColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                              ),
+                              child: const Text(
+                                'OK',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showStatusUpdateDialog({
+    required String selectedTeam,
+    required VoidCallback onConfirm
+    }) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: ilocateRed),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.edit_note, color: ilocateRed, size: 32),
+                            const SizedBox(width: 8.0),
+                            Text(
+                              'STATUS UPDATE',
+                              style: TextStyle(
+                                fontSize: 20.0,
+                                fontWeight: FontWeight.bold,
+                                color: ilocateRed,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8.0),
+                         Text(
+                          'Are you sure you want to assign this incident to $selectedTeam?',
+                          style: TextStyle(fontSize: 14.0),
+                        ),
+                        const SizedBox(height: 8.0),
+                        Row(
+                          children: const [
+                            Icon(Icons.warning, color: Colors.red, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'This action cannot be undone.',
+                              style: TextStyle(
+                                fontSize: 13.0,
+                                fontStyle: FontStyle.italic,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: ilocateRed),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                              ),
+                              child: Text('NO', style: TextStyle(color: ilocateRed)),
+                            ),
+                            const SizedBox(width: 8.0),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                onConfirm();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: ilocateRed,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                              ),
+                              child: const Text('YES', style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -249,7 +462,7 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
                                 'PERSONAL DETAILS', // Changed from 'DETAILS'
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 18.0,
+                                  fontSize: 16.0,
                                   color: ilocateRed,
                                 ),
                               ),
@@ -257,7 +470,6 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildDetailRow('FULL NAME', _fullName ?? 'N/A'), // Added this line
                                   _buildDetailRow('PHONE', _phone ?? 'N/A'), // Added this line
                                   _buildDetailRow('ADDRESS', _address ?? 'N/A'), // Added this line
                                   _buildDetailRow('AGE', _dateOfBirth != null ? _calculateAge(_dateOfBirth!) : 'N/A'), // Added this line with calculation
@@ -267,7 +479,7 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
                                     'ALERT DETAILS', // Added new heading for clarity
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 18.0,
+                                      fontSize: 16.0,
                                       color: ilocateRed,
                                     ),
                                   ),
@@ -370,17 +582,25 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
   }
 
   Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.0)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.0)),
-        ],
-      ),
-    );
-  }
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4.0),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.0)),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right, 
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.0),
+            softWrap: true,
+            overflow: TextOverflow.ellipsis, 
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildLocationRow(String label, String location) {
     return Padding(
@@ -388,12 +608,12 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.0)),
+          Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.0)),
           Flexible(
             child: Text(
               location,
               textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.0),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.0),
             ),
           ),
         ],

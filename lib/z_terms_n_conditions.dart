@@ -11,18 +11,9 @@ class TermsAndConditions extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: ilocateRed,
         toolbarHeight: 90.0,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          // This will go back to the previous screen on the navigation stack,
-          // which should be z_Settings.dart, as per the user's request.
-          child: const Padding(
-            padding: EdgeInsets.only(left: 16.0),
-            child: Icon(
-              Icons.arrow_back_ios_new,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 24),
+          onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'TERMS & CONDITIONS OF USE',
