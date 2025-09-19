@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -8,10 +9,13 @@ class AdminHomePage extends StatefulWidget {
 }
 
 class _AdminHomePageState extends State<AdminHomePage> {
-  // Placeholder for the number of ongoing alerts
   final int _sosNotificationCount = 2;
 
-  // This function is now empty as the functionality was removed per your request
+  // Default map position
+  static const LatLng _initialPosition = LatLng(14.5995, 120.9842); // Manila
+
+  GoogleMapController? _mapController;
+
   void _onSosButtonPressed() {}
 
   @override
@@ -21,11 +25,17 @@ class _AdminHomePageState extends State<AdminHomePage> {
     return Scaffold(
       body: Stack(
         children: [
-          const Center(
-            child: Text(
-              'Map will be displayed here.',
-              style: TextStyle(fontSize: 24, color: Colors.grey),
+          GoogleMap(
+            initialCameraPosition: const CameraPosition(
+              target: _initialPosition,
+              zoom: 12,
             ),
+            onMapCreated: (controller) {
+              _mapController = controller;
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+            zoomControlsEnabled: false,
           ),
           Positioned(
             top: 16.0,

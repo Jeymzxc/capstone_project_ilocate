@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'database/firebase_db.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class Team extends StatefulWidget {
   const Team({super.key});
@@ -22,23 +24,41 @@ class Team extends StatefulWidget {
     }
 
     Future<void> _loadTeamData() async {
-      final teams = await _db.getTeams();
-      if (teams.isNotEmpty) {
-        final team = teams.first;
-        final teamId = team['id'];
-        final teamMembers = await _db.getTeamMembers(teamId);
+      final prefs = await SharedPreferences.getInstance();
+      final teamsId = prefs.getString('teamsId');
 
-        setState(() {
-          teamName = team['teamName'] ?? "Unnamed Team";
-          members = teamMembers;
-          isLoading = false;
-        });
-      } else {
-        setState(() {
-          isLoading = false;
-        });
+      if (teamsId != null) {
+        try {
+          final teams = await _db.getTeams();
+        
+          if (!mounted) return;
+          if (teams.isNotEmpty) {
+           
+            final team = teams.firstWhere((t) => t['id'] == teamsId, orElse: () => {});
+          
+            if (team.isNotEmpty) {
+              final teamMembers = await _db.getTeamMembers(teamsId);
+
+              if (!mounted) return;
+              setState(() {
+                teamName = team['teamName'] ?? "Unnamed Team";
+                members = teamMembers;
+                isLoading = false;
+              });
+              return; 
+            }
+          }
+        } catch (e) {
+          print('Error loading team data: $e');
+        }
       }
-    }
+    
+    // Handle cases where teamsId is null or the team is not found
+    if (!mounted) return;
+    setState(() {
+      isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -117,18 +137,27 @@ class Team extends StatefulWidget {
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
-                                          member['fullname'] ?? "Unnamed",
-                                          style: const TextStyle(
-                                            fontSize: 18.0,
-                                            fontWeight: FontWeight.bold,
+                                        Expanded( // Wrap the fullname text with Expanded
+                                          child: Text(
+                                            member['fullname'] ?? "Unnamed",
+                                            style: const TextStyle(
+                                              fontSize: 16.0,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            maxLines: 2, 
+                                            overflow: TextOverflow.ellipsis, 
                                           ),
                                         ),
-                                        Text(
-                                          member['role'] ?? "No role",
-                                          style: const TextStyle(
-                                            fontSize: 16.0,
-                                            color: Colors.grey,
+                                        Expanded( 
+                                          child: Text(
+                                            member['role'] ?? "No role",
+                                            textAlign: TextAlign.right, 
+                                            style: const TextStyle(
+                                              fontSize: 14.0,
+                                              color: Colors.grey,
+                                            ),
+                                            maxLines: 2, 
+                                            overflow: TextOverflow.ellipsis, 
                                           ),
                                         ),
                                       ],

@@ -225,7 +225,7 @@ class _UserLoginState extends State<UserLogin> {
                         Column(
                           children: [
                             Text(
-                              'ILocate',
+                              'iLocate',
                               style: TextStyle(
                                 fontSize: 34,
                                 fontWeight: FontWeight.bold,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -9,6 +10,11 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   final int _sosNotificationCount = 2;
+
+  // Default map location (Manila)
+  static const LatLng _initialPosition = LatLng(14.5995, 120.9842);
+
+  GoogleMapController? _mapController;
 
   void _onSosButtonPressed() {
     debugPrint("SOS Button Pressed!");
@@ -21,11 +27,17 @@ class _HomeState extends State<Home> {
     return Scaffold(
       body: Stack(
         children: [
-          const Center(
-            child: Text(
-              'Map will be displayed here.',
-              style: TextStyle(fontSize: 24, color: Colors.grey),
+          GoogleMap(
+            initialCameraPosition: const CameraPosition(
+              target: _initialPosition,
+              zoom: 12,
             ),
+            onMapCreated: (controller) {
+              _mapController = controller;
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+            zoomControlsEnabled: false,
           ),
           Positioned(
             top: 16.0,

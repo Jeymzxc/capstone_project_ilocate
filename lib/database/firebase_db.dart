@@ -1,9 +1,306 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bcrypt/bcrypt.dart';
+import 'dart:async';
+
 
 class DatabaseService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
+
+  // --- INCIDENT MANAGEMENT FUNCTION ---
+
+
+  // Streams incidents that are pending assignment (ADMIN dashboard only)
+  Stream<List<Map<String, dynamic>>> streamPendingIncidents() {
+    return _db.child('incidents')
+        .orderByChild('status')
+        .equalTo('pending')
+        .onValue
+        .map((event) {
+      List<Map<String, dynamic>> incidents = [];
+      if (event.snapshot.value != null && event.snapshot.value is Map) {
+        final Map<String, dynamic> data = Map<String, dynamic>.from(event.snapshot.value as Map);
+        data.forEach((key, value) {
+          final incidentData = Map<String, dynamic>.from(value as Map);
+          incidentData['id'] = key;
+          incidents.add(incidentData);
+        });
+      }
+      return incidents;
+    });
+  }
+
+  // Streams incidents assigned to a specific team (Rescuer dashboard)
+  Stream<List<Map<String, dynamic>>> streamRescuerIncidents(String teamId) {
+    return _db.child('incidents')
+        .orderByChild('assignedTeam')
+        .equalTo(teamId)
+        .onValue
+        .map((event) {
+      List<Map<String, dynamic>> incidents = [];
+      if (event.snapshot.value != null && event.snapshot.value is Map) {
+        final Map<String, dynamic> data = Map<String, dynamic>.from(event.snapshot.value as Map);
+        data.forEach((key, value) {
+          final incidentData = Map<String, dynamic>.from(value as Map);
+          // Only include incidents that are specifically 'assigned' and not yet in progress
+          final status = incidentData['status'] as String?;
+          if (status == 'assigned') {
+            incidentData['id'] = key;
+            incidents.add(incidentData);
+          }
+        });
+      }
+      return incidents;
+    });
+  }
+
+    // Get specific Team Name (Connected to Stream Rescuer Incidents)
+    Future<Map<String, dynamic>?> getSingleTeam(String teamsId) async {
+    try {
+      // This fetches a single team document by its unique key/ID.
+      DatabaseEvent event = await _db.child('teams').child(teamsId).once();
+      if (event.snapshot.value != null && event.snapshot.value is Map) {
+        // Cast and return the single team's data.
+        return Map<String, dynamic>.from(event.snapshot.value as Map);
+      }
+    } catch (e) {
+      print('Error fetching single team data: $e');
+    }
+    return null;
+  }
+
+  // Streams a single incident by its incidentId (real-time updates for Rescuer)
+  Stream<Map<String, dynamic>?> streamIncidentById(String incidentId) {
+    return _db.child('incidents/$incidentId').onValue.map((event) {
+      final data = event.snapshot.value;
+      if (data != null && data is Map) {
+        final incidentData = Map<String, dynamic>.from(data);
+        incidentData['id'] = incidentId; // include the incidentId in the map
+        return incidentData;
+      }
+      return null; // incident not found
+    });
+  }
+
+    // Stream the latest alert for a specific device 
+  Stream<Map<String, dynamic>?> streamLatestDeviceData(String deviceId) {
+    final ref = _db.child("ttnData/$deviceId");
+    return ref.onValue.map((event) {
+      final data = event.snapshot.value;
+      if (data == null) return null;
+      final alertsMap = Map<String, dynamic>.from(data as Map);
+      Map<String, dynamic>? latestAlert;
+      int latestTimestamp = 0;
+
+      alertsMap.forEach((alertId, alertData) {
+        final alert = Map<String, dynamic>.from(alertData as Map);
+        final timestamp = alert['timestamp'] is int
+            ? alert['timestamp'] as int
+            : int.tryParse(alert['timestamp'].toString()) ?? 0;
+
+        if (timestamp > latestTimestamp) {
+          latestTimestamp = timestamp;
+          alert['id'] = alertId;
+          alert['deviceId'] = deviceId;
+          latestAlert = alert;
+        }
+      });
+
+      return latestAlert;
+    });
+  }
+
+
+  // Combined streamIncidentById and streamLatestDeviceData (for Rescuer)
+  Stream<Map<String, dynamic>> streamCombinedIncident(String incidentId, String deviceId) {
+    final incidentStream = streamIncidentById(incidentId);
+    final ttnStream = streamLatestDeviceData(deviceId);
+
+    Map<String, dynamic> latestIncident = {};
+    Map<String, dynamic> latestTtn = {};
+
+    // Create a controller to output the merged stream
+    final controller = StreamController<Map<String, dynamic>>.broadcast();
+
+    void emitCombined() {
+      final combinedValue = latestTtn.isNotEmpty
+          ? latestTtn
+          : Map<String, dynamic>.from(latestIncident['value'] ?? {});
+
+      controller.add({
+        ...latestIncident,
+        'ttnData': latestTtn,
+        'combinedValue': combinedValue,
+      });
+    }
+
+    // Listen to both streams
+    incidentStream.listen((incident) {
+      latestIncident = incident ?? {};
+      emitCombined();
+    });
+
+    ttnStream.listen((ttn) {
+      latestTtn = ttn ?? {};
+      emitCombined();
+    });
+
+    return controller.stream;
+  }
+
+
+
+
+  // Creates a new incident if none exists for the device, otherwise updates the existing incident
+  Future<String?> createIncident(Map<String, dynamic> ttnData, String assignedTeam) async {
+   
+    final existingIncident = await getAnyIncidentByDevice(ttnData['device']);
+
+    if (existingIncident != null) {
+      final status = existingIncident['status'];
+      final existingId = existingIncident['id'];
+
+      if (status == 'pending' || status == 'in_progress' || status == 'assigned') {
+        // It's still active, so just update it.
+        await updateIncident(existingId, ttnData);
+        return existingId;
+      }
+
+      if (status == 'cancelled' || status == 'resolved') {
+        // It was previously cancelled or resolved.
+        // Now, check if the new signal is actually new (based on timestamp).
+        if (ttnData['timestamp'] > existingIncident['lastTimestamp']) {
+          // If it's a new signal, reactivate the existing incident.
+          await changeIncidentStatus(existingId, 'pending');
+          await updateIncident(existingId, ttnData);
+          print("Incident was ${status}. Re-opening as pending due to new distress signal.");
+          return existingId;
+        } else {
+
+          print("Incident is $status — same TTN signal, skipping.");
+          return null;
+        }
+      }
+    }
+
+    // If no incident exists at all, create a new one.
+    final incidentRef = _db.child('incidents').push();
+    await incidentRef.set({
+      'deviceId': ttnData['device'],
+      'devuid': ttnData['device'],
+      'assignedTeam': assignedTeam,
+      'status': 'pending',
+      'value': ttnData['value'],
+      'firstTimestamp': ttnData['timestamp'],
+      'lastTimestamp': ttnData['timestamp'],
+    });
+    return incidentRef.key!;
+  }
+
+
+  // Updates an existing incident with latest TTN data (location, heart rate, timestamp)
+  Future<void> updateIncident(String incidentId, Map<String, dynamic> ttnData) async {
+    final incidentRef = _db.child('incidents/$incidentId');
+
+    await incidentRef.update({
+      'value': ttnData['value'],           // update distress, location, heartRate, etc.
+      'lastTimestamp': ttnData['timestamp'], // latest timestamp from TTN
+    });
+  }
+
+
+  // Changes the status of an incident
+  Future<void> changeIncidentStatus(String incidentId, String newStatus, {String? assignedTeam}) async {
+    final incidentRef = _db.child('incidents/$incidentId');
+    final updates = <String, dynamic>{
+      'status': newStatus,
+    };
+
+    if (newStatus == "assigned") {
+      if (assignedTeam != null) {
+        updates['assignedTeam'] = assignedTeam;
+        updates['assignedAt'] = DateTime.now().millisecondsSinceEpoch;
+      }
+    } else if (newStatus == "in_progress") {
+      updates['startedAt'] = DateTime.now().millisecondsSinceEpoch;
+    } else if (newStatus == "resolved") {
+      updates['resolvedAt'] = DateTime.now().millisecondsSinceEpoch;
+    } else if (newStatus == "cancelled") {
+      updates['cancelledAt'] = DateTime.now().millisecondsSinceEpoch;
+    }
+
+    await incidentRef.update(updates);
+  }
+
+
+  // --- Check if an incident already exists for a device (any status) ---
+  Future<Map<String, dynamic>?> getAnyIncidentByDevice(String deviceId) async {
+    try {
+      final query = await _db.child('incidents')
+          .orderByChild('deviceId')
+          .equalTo(deviceId)
+          .get(); // Get all incidents for the device
+
+      if (query.value != null) {
+        final incidentsMap = Map<String, dynamic>.from(query.value as Map);
+        Map<String, dynamic>? latestIncident;
+        int latestTimestamp = 0;
+
+        // Iterate to find the most recent incident, regardless of status
+        incidentsMap.forEach((key, value) {
+          final incidentData = Map<String, dynamic>.from(value);
+          final timestamp = incidentData['lastTimestamp'] ?? 0;
+          if (timestamp > latestTimestamp) {
+            latestTimestamp = timestamp;
+            latestIncident = incidentData;
+            latestIncident!['id'] = key;
+          }
+        });
+        return latestIncident;
+      }
+      return null;
+    } catch (e) {
+      print("Error fetching any incident by device: $e");
+      return null;
+    }
+  }
+
+  // --- Check if an incident already exists for a device ---
+  Future<Map<String, dynamic>?> getIncidentByDevice(String deviceId) async {
+    try {
+      final query = await _db.child('incidents')
+          .orderByChild('deviceId')
+          .equalTo(deviceId)
+          .get();
+
+      if (query.value != null) {
+        final incidentsMap = Map<String, dynamic>.from(query.value as Map);
+
+        for (var entry in incidentsMap.entries) {
+          final incidentData = Map<String, dynamic>.from(entry.value);
+          final status = incidentData['status'] as String?;
+
+          // Only return incident if it is pending or in progress
+          if (status == 'pending' || status == 'in_progress' || status == 'assigned') {  
+            incidentData['id'] = entry.key;
+            return incidentData;
+          }
+        }
+      }
+
+      return null;
+    } catch (e) {
+      print("Error fetching incident by device: $e");
+      return null;
+    }
+  }
+
+
+
+
+
+
+
 
 
 // --- DEVICE DATA MANAGEMENT FUNCTIONS ---
@@ -46,7 +343,7 @@ class DatabaseService {
                 : int.tryParse(alert['timestamp'].toString()) ?? 0;
 
             if (!latestByDevice.containsKey(deviceId) ||
-                timestamp < (latestByDevice[deviceId]?['timestamp'] ?? 0)) {
+                timestamp > (latestByDevice[deviceId]?['timestamp'] ?? 0)) {
               latestByDevice[deviceId] = alert;
             }
           }
@@ -55,35 +352,6 @@ class DatabaseService {
 
       return latestByDevice.values.toList();
     });
-  }
-
-  // Fetch the latest alert for a specific device 
-  Future<Map<String, dynamic>?> getLatestDeviceData(String deviceId) async {
-    final ref = FirebaseDatabase.instance.ref('ttnData/$deviceId');
-
-    final snapshot = await ref.get();
-    if (!snapshot.exists) return null;
-
-    final alertsMap = Map<String, dynamic>.from(snapshot.value as Map);
-    Map<String, dynamic>? latestAlert;
-    int latestTimestamp = 0;
-
-    alertsMap.forEach((alertId, alertData) {
-      final alert = Map<String, dynamic>.from(alertData as Map);
-      final timestamp = (alert['timestamp'] is int)
-          ? alert['timestamp'] as int
-          : int.tryParse(alert['timestamp'].toString()) ?? 0;
-
-      // Keep the alert with the largest timestamp (latest)
-      if (timestamp > latestTimestamp) {
-        latestTimestamp = timestamp;
-        alert['id'] = alertId;
-        alert['deviceId'] = deviceId;
-        latestAlert = alert;
-      }
-    });
-
-    return latestAlert;
   }
 
 
@@ -104,6 +372,96 @@ class DatabaseService {
       print("Error fetching device info: $e");
       return null;
     }
+  }
+
+
+
+
+
+
+    // ---- LOGS INCIDENT FOR SPECIFIC RESCUE TEAMS ---
+
+  Stream<List<Map<String, dynamic>>> streamRescuerLogs(String teamName) {
+    return _db.child('incidents')
+      .onValue
+      .map((event) {
+        List<Map<String, dynamic>> incidents = [];
+        if (event.snapshot.value != null && event.snapshot.value is Map) {
+          final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+          data.forEach((key, value) {
+            final incidentData = Map<String, dynamic>.from(value as Map);
+            final assignedTeam = incidentData['assignedTeam'] as String?;
+            final status = incidentData['status'] as String?;
+            
+            // Include incidents assigned to this team and not cancelled
+            if (assignedTeam == teamName && status != 'cancelled' && status != 'assigned') {
+              incidentData['id'] = key;
+              incidents.add(incidentData);
+            }
+          });
+        }
+        return incidents;
+      });
+  }
+
+
+
+  // ---- LOGS INCIDENT FOR ADMIN ---
+
+  // Streams all active incidents (used for the Admin's "Active Incidents" tab)
+  Stream<List<Map<String, dynamic>>> streamAllActiveIncidents() {
+    return _db.child('incidents')
+        .onValue
+        .map((event) {
+      List<Map<String, dynamic>> incidents = [];
+      if (event.snapshot.value != null && event.snapshot.value is Map) {
+        final Map<String, dynamic> data = Map<String, dynamic>.from(event.snapshot.value as Map);
+        data.forEach((key, value) {
+          final incidentData = Map<String, dynamic>.from(value as Map);
+          final status = incidentData['status'] as String?;
+          // Only include incidents with active statuses
+          if (status != 'cancelled' && incidentData['archived'] != true) {
+            incidentData['id'] = key;
+            incidents.add(incidentData);
+          }
+        });
+      }
+      return incidents;
+    });
+  }
+
+  // Streams all archived incidents
+  Stream<List<Map<String, dynamic>>> streamAllArchivedIncidents() {
+    return _db.child('incidents')
+        .orderByChild('archived')
+        .equalTo(true)
+        .onValue
+        .map((event) {
+      List<Map<String, dynamic>> incidents = [];
+      if (event.snapshot.value != null && event.snapshot.value is Map) {
+        final Map<String, dynamic> data = Map<String, dynamic>.from(event.snapshot.value as Map);
+        data.forEach((key, value) {
+          final incidentData = Map<String, dynamic>.from(value as Map);
+          incidentData['id'] = key;
+          incidents.add(incidentData);
+        });
+      }
+      return incidents;
+    });
+  }
+
+  // Function to update the `archived` status of an incident
+  Future<void> archiveIncident(String incidentId) async {
+    await _db.child('incidents/$incidentId').update({
+      'archived': true,
+    });
+  }
+
+  // Function to remove the `archived` status of an incident
+  Future<void> unarchiveIncident(String incidentId) async {
+    await _db.child('incidents/$incidentId').update({
+      'archived': null, // Firebase removes the key if you set it to null
+    });
   }
 
 
@@ -368,6 +726,7 @@ class DatabaseService {
       return [];
     }
   }
+
 
     // Display Team Name
     Future<List<Map<String, dynamic>>> getTeams() async {

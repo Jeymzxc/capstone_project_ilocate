@@ -3,9 +3,9 @@ import 'c_mark_resolved.dart';
 import 'models/alert.dart';
 
 class ConfirmedRespond extends StatelessWidget {
-  final String incidentId;
+  final Alert alert;
 
-  const ConfirmedRespond({super.key, required this.incidentId});
+  const ConfirmedRespond({super.key, required this.alert});
 
   final Color ilocateRed = const Color(0xFFC70000);
   final Color linkBlue = Colors.blue;
@@ -16,7 +16,7 @@ class ConfirmedRespond extends StatelessWidget {
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(160),
         child: AppBar(
-          automaticallyImplyLeading: false, // This removes the back button
+          automaticallyImplyLeading: false,
           backgroundColor: ilocateRed,
           flexibleSpace: Align(
             alignment: Alignment.bottomLeft,
@@ -65,45 +65,26 @@ class ConfirmedRespond extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Updated icon to use a solid checkmark circle
-                Icon(
-                  Icons.check_circle,
-                  color: ilocateRed,
-                  size: 150, // Increased the size for prominence
-                ),
+                Icon(Icons.check_circle, color: ilocateRed, size: 150),
                 const SizedBox(height: 32.0),
                 const Text(
                   'Respond to the Incident',
-                  style: TextStyle(
-                    fontSize: 20.0,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const Text(
                   'has been confirmed!',
-                  style: TextStyle(
-                    fontSize: 20.0,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
+                  style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12.0),
                 Text(
-                  'ID: $incidentId',
-                  style: const TextStyle(
-                    fontSize: 16.0,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
+                  'ID: ${alert.incidentId}',
+                  style: const TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 24.0),
                 const Text(
                   'Check Incident log to update the\nstate of the incident.',
-                  style: TextStyle(
-                    fontSize: 14.0,
-                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48.0),
@@ -111,23 +92,13 @@ class ConfirmedRespond extends StatelessWidget {
                   width: 250,
                   child: ElevatedButton(
                     onPressed: () {
-                      // Navigate to the MarkResolved page, passing a complete Alert object
-                      // NOTE: I am using placeholder data for the other fields. You will need to
-                      // replace this with actual data.
-                      final alert = Alert(
-                        rescueeName: 'John Doe',
-                        incidentId: incidentId,
-                        date: '2025-08-15',
-                        time: '12:00 PM',
-                        location: '123 Main St',
-                        heartRate: '95 bpm',
-                        deviceId: '',
-                      );
-
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => MarkResolved(alert: alert),
+                          builder: (context) => MarkResolved(
+                            incidentId: alert.incidentId,
+                            deviceId: alert.deviceId,
+                          ),
                         ),
                       );
                     },
@@ -141,12 +112,7 @@ class ConfirmedRespond extends StatelessWidget {
                     ),
                     child: const Text(
                       'NAVIGATE',
-                      style: TextStyle(
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 1.2,
-                      ),
+                      style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                   ),
                 ),
