@@ -206,11 +206,12 @@ class _x_TeamState extends State<x_Team> {
                             const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       ),
                       onPressed: () async {
-                        setStateDialog(() => _isDeleting = true); // Added: show loader
+                        setStateDialog(() => _isDeleting = true); 
                         try {
                           await _databaseService.deleteTeam(teamId);
-                          setStateDialog(() => _isDeleting = false); // Added: hide loader
-                          Navigator.of(context).pop(); // Close dialog
+                          setStateDialog(() => _isDeleting = false); 
+                          if (!context.mounted) return;
+                          Navigator.of(context).pop(); 
                           _showCustomDialog(
                             title: 'Success!',
                             message: 'Successfully deleted.',
@@ -219,7 +220,8 @@ class _x_TeamState extends State<x_Team> {
                           );
                           _refreshTeams();
                         } catch (e) {
-                          setStateDialog(() => _isDeleting = false); // Added: hide loader
+                          setStateDialog(() => _isDeleting = false); 
+                          if (!context.mounted) return;
                           Navigator.of(context).pop();
                           _showCustomDialog(
                             title: 'Error!',
@@ -227,7 +229,7 @@ class _x_TeamState extends State<x_Team> {
                             headerColor: Colors.red,
                             icon: Icons.error_outline,
                           );
-                          print('Error deleting team: $e');
+                          debugPrint('Error deleting team: $e');
                         }
                       },
                       child: const Text(
@@ -261,8 +263,8 @@ class _x_TeamState extends State<x_Team> {
       child: InkWell(
         onTap: () => _addNewGroup(context),
         borderRadius: BorderRadius.circular(12.0),
-        splashColor: Colors.grey.withOpacity(0.3),
-        highlightColor: Colors.grey.withOpacity(0.4),
+        splashColor: Colors.grey.withValues(alpha: 0.3),
+        highlightColor: Colors.grey.withValues(alpha: 0.4),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           decoration: BoxDecoration(
@@ -298,8 +300,8 @@ class _x_TeamState extends State<x_Team> {
           );
         },
         borderRadius: BorderRadius.circular(12.0),
-        splashColor: Colors.grey.withOpacity(0.3),
-        highlightColor: Colors.grey.withOpacity(0.4),
+        splashColor: Colors.grey.withValues(alpha: 0.3),
+        highlightColor: Colors.grey.withValues(alpha: 0.4),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           decoration: BoxDecoration(

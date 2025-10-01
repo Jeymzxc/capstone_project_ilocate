@@ -245,7 +245,7 @@ class _x_teamMemberState extends State<x_teamMember> {
         if (!mounted) return;
         Navigator.pop(context, {'success': true});
       } catch (e) {
-        print('Firebase error while adding members: $e');
+        debugPrint('Firebase error while adding members: $e');
         await _showCustomDialog(
           title: 'Error',
           message: 'An unexpected error occurred. Please try again.',
@@ -336,8 +336,8 @@ class _x_teamMemberState extends State<x_teamMember> {
                         child: InkWell(
                           onTap: _addMemberForm,
                           borderRadius: BorderRadius.circular(12.0),
-                          splashColor: Colors.grey.withOpacity(0.3),
-                          highlightColor: Colors.grey.withOpacity(0.1),
+                          splashColor: Colors.grey.withValues(alpha: 0.3),
+                          highlightColor: Colors.grey.withValues(alpha: 0.1),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 16.0),
                             decoration: BoxDecoration(

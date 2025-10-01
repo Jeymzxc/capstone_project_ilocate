@@ -45,7 +45,7 @@ class _z_SettingsState extends State<z_Settings> {
           });
         }
       } catch (e) {
-        print('Error loading admin info: $e');
+        debugPrint('Error loading admin info: $e');
       }
     }
 
@@ -194,8 +194,8 @@ class _z_SettingsState extends State<z_Settings> {
     required VoidCallback onTap,
   }) {
     return InkWell(
-      splashColor: Colors.grey.withOpacity(0.2),
-      highlightColor: Colors.grey.withOpacity(0.1),
+      splashColor: Colors.grey.withValues(alpha: 0.2),
+      highlightColor: Colors.grey.withValues(alpha: 0.1),
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 14.0),

@@ -145,7 +145,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ],
             currentIndex: _selectedIndex,
             selectedItemColor: Colors.white,
-            unselectedItemColor: Colors.white.withOpacity(0.6),
+            unselectedItemColor: Colors.white.withValues(alpha: 0.6),
             onTap: _onItemTapped,
             backgroundColor: ilocateRed,
             type: BottomNavigationBarType.fixed,

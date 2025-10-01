@@ -45,7 +45,7 @@ class _SettingsState extends State<Settings> {
           });
         }
       } catch (e) {
-        print('Error loading team info: $e');
+        debugPrint('Error loading team info: $e');
       }
     }
     
@@ -142,6 +142,8 @@ class _SettingsState extends State<Settings> {
                                 final prefs = await SharedPreferences.getInstance();
                                 await prefs.clear();
 
+                                if (!context.mounted) return;
+
                                 Navigator.of(context).pop();
                                 Navigator.pushReplacement(
                                   context,
@@ -197,8 +199,8 @@ class _SettingsState extends State<Settings> {
     required VoidCallback onTap,
   }) {
     return InkWell(
-      splashColor: Colors.grey.withOpacity(0.2),
-      highlightColor: Colors.grey.withOpacity(0.1),
+      splashColor: Colors.grey.withValues(alpha: 0.2),
+      highlightColor: Colors.grey.withValues(alpha: 0.1),
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 14.0),

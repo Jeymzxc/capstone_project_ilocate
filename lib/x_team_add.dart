@@ -309,7 +309,7 @@ class _x_teamAddState extends State<x_teamAdd> {
             }
 
         } catch (e) {
-          print('Firebase error while creating team: $e');
+          debugPrint('Firebase error while creating team: $e');
           _showCustomDialog(
             title: 'Error',
             message: 'An unexpected error occurred. Please try again.',
@@ -433,8 +433,8 @@ class _x_teamAddState extends State<x_teamAdd> {
                         child: InkWell(
                           onTap: _addMemberForm,
                           borderRadius: BorderRadius.circular(12.0),
-                          splashColor: Colors.grey.withOpacity(0.3),
-                          highlightColor: Colors.grey.withOpacity(0.1),
+                          splashColor: Colors.grey.withValues(alpha: 0.3),
+                          highlightColor: Colors.grey.withValues(alpha: 0.1),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 16.0),
                             decoration: BoxDecoration(
@@ -484,7 +484,7 @@ class _x_teamAddState extends State<x_teamAdd> {
         // positioned on top of the Scaffold.
         if (_isLoading)
           Container(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
             child: const Center(
               child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFC70000)),

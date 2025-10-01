@@ -49,7 +49,7 @@ class Team extends StatefulWidget {
             }
           }
         } catch (e) {
-          print('Error loading team data: $e');
+          debugPrint('Error loading team data: $e');
         }
       }
     

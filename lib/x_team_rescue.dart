@@ -49,7 +49,7 @@ class _TeamRescueState extends State<TeamRescue> {
         _hasTeamLeader = members.any((member) => member['role'] == 'Team Leader');
       });
     } catch (e) {
-      print('Error loading team members: $e');
+      debugPrint('Error loading team members: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -74,7 +74,7 @@ class _TeamRescueState extends State<TeamRescue> {
 
       await _loadTeamMembers(); 
     } catch (e) {
-      print('Error deleting member from Firebase: $e');
+      debugPrint('Error deleting member from Firebase: $e');
       await _showCustomDialog(
         title: 'Error',
         message: 'Failed to remove member. Please try again.',

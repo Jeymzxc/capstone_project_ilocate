@@ -39,7 +39,7 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
         _isLoadingAdmins = false;
       });
     } catch (e) {
-      print('Error fetching admins: $e');
+      debugPrint('Error fetching admins: $e');
       setState(() {
         _isLoadingAdmins = false;
       });
@@ -54,7 +54,7 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
         _isLoadingDevices = false;
       });
     } catch (e) {
-      print('Error fetching devices: $e');
+      debugPrint('Error fetching devices: $e');
       setState(() {
         _isLoadingDevices = false;
       });

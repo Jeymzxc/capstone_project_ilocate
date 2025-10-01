@@ -78,7 +78,7 @@ class _AdminNavigationScreenState extends State<AdminNavigationScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withValues(alpha: 0.3),
               spreadRadius: 2,
               blurRadius: 10,
               offset: const Offset(0, 5), // Changes position of shadow
@@ -161,7 +161,7 @@ class _AdminNavigationScreenState extends State<AdminNavigationScreen> {
             ],
             currentIndex: _selectedIndex,
             selectedItemColor: Colors.white,
-            unselectedItemColor: Colors.white.withOpacity(0.6),
+            unselectedItemColor: Colors.white.withValues(alpha: 0.6),
             onTap: _onItemTapped,
             backgroundColor: ilocateRed,
             type: BottomNavigationBarType.fixed,

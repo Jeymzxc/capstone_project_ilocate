@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification color (used for status bar small icon tint) -->
+    <color name="notification_color">#FFC70000</color> 
+</resources>
