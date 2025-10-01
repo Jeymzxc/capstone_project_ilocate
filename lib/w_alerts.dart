@@ -29,7 +29,7 @@ class _wAlertsState extends State<wAlerts> {
    
           await _databaseService.createIncident(alert, '');
         } catch (e) {
-          print("Error processing incoming alert for device ${alert['deviceId']}: $e");
+          debugPrint("Error processing incoming alert for device ${alert['deviceId']}: $e");
         }
       }
     });
@@ -102,6 +102,8 @@ class _wAlertsState extends State<wAlerts> {
           time: time,
           location: 'Lat $latitude, Long $longitude',
           heartRate: '$heartRate BPM',
+          latitude: (value['latitude'] != null) ? double.tryParse(value['latitude'].toString()) ?? 0.0 : 0.0,
+          longitude: (value['longitude'] != null) ? double.tryParse(value['longitude'].toString()) ?? 0.0 : 0.0,
         );
 
         return Container(
@@ -296,7 +298,8 @@ class _wAlertsState extends State<wAlerts> {
                               setStateDialog(() => isCancelling = true);
                               try {
                                 await _cancelIncident(incidentId);
-                                if (!mounted) return;
+                                
+                                if (!context.mounted) return;
                                 Navigator.of(context).pop();
                                  _showCustomDialog(
                                   title: 'Success',
@@ -306,7 +309,7 @@ class _wAlertsState extends State<wAlerts> {
                                   isSuccess: false, 
                                 );
                               } catch (e) {
-                                if (!mounted) return;
+                                if (!context.mounted) return;
                                 Navigator.of(context).pop();
                                 _showCustomDialog(
                                   title: 'Error',

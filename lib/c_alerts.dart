@@ -196,11 +196,13 @@ class _AlertsState extends State<Alerts> {
         final alertModel = Alert(
           rescueeName: rescueeName,
           incidentId: incident['id'] ?? incident['key'],
+          deviceId: deviceId,
           date: date,
           time: time,
           location: 'Lat $latitude, Long $longitude',
           heartRate: '$heartRate BPM',
-          deviceId: deviceId,
+          latitude: (value['latitude'] != null) ? double.tryParse(value['latitude'].toString()) ?? 0.0 : 0.0,
+          longitude: (value['longitude'] != null) ? double.tryParse(value['longitude'].toString()) ?? 0.0 : 0.0,
         );
 
         return Container(

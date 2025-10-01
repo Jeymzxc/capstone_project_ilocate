@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'database/firebase_db.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -9,14 +10,66 @@ class AdminHomePage extends StatefulWidget {
 }
 
 class _AdminHomePageState extends State<AdminHomePage> {
+  final DatabaseService _databaseService = DatabaseService();
   final int _sosNotificationCount = 2;
 
-  // Default map position
-  static const LatLng _initialPosition = LatLng(14.5995, 120.9842); // Manila
+  static const LatLng _initialPosition = LatLng(14.0230, 121.0930);
+  LatLng? _lastMarkerPosition;
 
   GoogleMapController? _mapController;
+  final Set<Marker> _markers = {};
 
-  void _onSosButtonPressed() {}
+  @override
+  void initState() {
+    super.initState();
+
+    // Subscribe to distress data
+    _databaseService.streamAdminIncidents().listen((victims) async {
+      final updatedMarkers = <Marker>{};
+
+      for (var victim in victims) {
+        final devuid = victim["deviceId"];
+        final lat = victim["value"]["latitude"];
+        final lng = victim["value"]["longitude"];
+        final hr = victim["value"]["heartRate"];
+
+        // Fetch wearer info
+        final deviceInfo = await _databaseService.getDeviceInfoByDevuid(devuid);
+
+        final fullname = deviceInfo?["fullname"] ?? "Unknown";
+        final phone = deviceInfo?["phone"] ?? "N/A";
+
+        updatedMarkers.add(
+          Marker(
+            markerId: MarkerId(devuid),
+            position: LatLng(lat, lng),
+            infoWindow: InfoWindow(
+              title: fullname, // Wearer’s full name
+              snippet: "Heart Rate: $hr | Phone: $phone",
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+            onTap: () {
+              if (_mapController != null) {
+                _lastMarkerPosition = LatLng(lat, lng);
+                _mapController!.animateCamera(
+                  CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16),
+                );
+              }
+            },
+          ),
+        );
+      }
+
+      // Update markers on the map
+      if (mounted) {
+        setState(() {
+          _markers
+            ..clear()
+            ..addAll(updatedMarkers);
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +89,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
             myLocationEnabled: true,
             myLocationButtonEnabled: true,
             zoomControlsEnabled: false,
+            markers: _markers,
           ),
+
+          // SOS notification button (top left)
           Positioned(
             top: 16.0,
             left: 16.0,
@@ -47,7 +103,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 borderRadius: BorderRadius.circular(12.0),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     spreadRadius: 1,
                     blurRadius: 5,
                     offset: const Offset(0, 3),
@@ -58,8 +114,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 alignment: Alignment.center,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.warning_amber, size: 30, color: ilocateRed),
-                    onPressed: _onSosButtonPressed,
+                    icon: const Icon(Icons.warning_amber,
+                        size: 30, color: ilocateRed),
+                    onPressed: () =>
+                        debugPrint("SOS Button pressed by Admin"),
                   ),
                   if (_sosNotificationCount > 0)
                     Positioned(
@@ -92,6 +150,18 @@ class _AdminHomePageState extends State<AdminHomePage> {
             ),
           ),
         ],
+      ),
+      // Button to reset the camera position
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.white,
+        child: const Icon(Icons.my_location, color: Colors.black),
+        onPressed: () {
+          if (_mapController != null && _lastMarkerPosition != null) {
+            _mapController!.animateCamera(
+              CameraUpdate.newLatLngZoom(_lastMarkerPosition!, 12),
+            );
+          }
+        },
       ),
     );
   }

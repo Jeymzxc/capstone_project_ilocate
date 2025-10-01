@@ -11,6 +11,8 @@ class Alert {
   final String heartRate;
   final bool isAcknowledged;
   final String? assignedTeam;
+  final double latitude;
+  final double longitude;
 
   Alert({
     required this.rescueeName,
@@ -22,6 +24,8 @@ class Alert {
     required this.heartRate,
     this.isAcknowledged = false,
     this.assignedTeam,
+    this.latitude = 0.0,
+    this.longitude = 0.0,
   });
 
   /// A factory constructor to create an Alert object from a generic Map (like from Realtime Database).
@@ -36,6 +40,8 @@ class Alert {
       heartRate: map['heartRate'] ?? '',
       isAcknowledged: map['isAcknowledged'] ?? false,
       assignedTeam: map['assignedTeam'] as String?,
+      latitude: (map['latitude'] != null) ? double.tryParse(map['latitude'].toString()) ?? 0.0 : 0.0,
+      longitude: (map['longitude'] != null) ? double.tryParse(map['longitude'].toString()) ?? 0.0 : 0.0,
     );
   }
 
@@ -51,6 +57,8 @@ class Alert {
       'heartRate': heartRate,
       'isAcknowledged': isAcknowledged,
       'assignedTeam': assignedTeam,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 

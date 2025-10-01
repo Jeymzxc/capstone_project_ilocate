@@ -1,4 +1,5 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bcrypt/bcrypt.dart';
 import 'dart:async';
@@ -30,6 +31,30 @@ class DatabaseService {
     });
   }
 
+  // Streams incidents that are active (For Admin Map Display)
+  Stream<List<Map<String, dynamic>>> streamAdminIncidents() {
+    return _db.child('incidents')
+        .onValue
+        .map((event) {
+      List<Map<String, dynamic>> incidents = [];
+      if (event.snapshot.value != null && event.snapshot.value is Map) {
+        final Map<String, dynamic> data = Map<String, dynamic>.from(event.snapshot.value as Map);
+        data.forEach((key, value) {
+          final incidentData = Map<String, dynamic>.from(value as Map);
+          incidentData['id'] = key;
+
+          // Only include incidents that are not cancelled or resolved
+          final status = incidentData['status'] ?? '';
+          if (status != 'cancelled' && status != 'resolved') {
+            incidents.add(incidentData);
+          }
+        });
+      }
+      return incidents;
+    });
+  }
+
+
   // Streams incidents assigned to a specific team (Rescuer dashboard)
   Stream<List<Map<String, dynamic>>> streamRescuerIncidents(String teamId) {
     return _db.child('incidents')
@@ -54,6 +79,30 @@ class DatabaseService {
     });
   }
 
+  // Streams incidents that are active (For Rescuer Map Display)
+  Stream<List<Map<String, dynamic>>> streamRescuerMapIncidents(String teamId) {
+    return _db.child('incidents')
+        .orderByChild('assignedTeam')
+        .equalTo(teamId)
+        .onValue
+        .map((event) {
+      List<Map<String, dynamic>> incidents = [];
+      if (event.snapshot.value != null && event.snapshot.value is Map) {
+        final Map<String, dynamic> data = Map<String, dynamic>.from(event.snapshot.value as Map);
+        data.forEach((key, value) {
+          final incidentData = Map<String, dynamic>.from(value as Map);
+          // Only include incidents that are specifically 'assigned' and 'in progress'
+          final status = incidentData['status'] as String?;
+          if (status == 'assigned' || status == 'in_progress') {
+            incidentData['id'] = key;
+            incidents.add(incidentData);
+          }
+        });
+      }
+      return incidents;
+    });
+  }
+
     // Get specific Team Name (Connected to Stream Rescuer Incidents)
     Future<Map<String, dynamic>?> getSingleTeam(String teamsId) async {
     try {
@@ -64,7 +113,7 @@ class DatabaseService {
         return Map<String, dynamic>.from(event.snapshot.value as Map);
       }
     } catch (e) {
-      print('Error fetching single team data: $e');
+      debugPrint('Error fetching single team data: $e');
     }
     return null;
   }
@@ -173,11 +222,11 @@ class DatabaseService {
           // If it's a new signal, reactivate the existing incident.
           await changeIncidentStatus(existingId, 'pending');
           await updateIncident(existingId, ttnData);
-          print("Incident was ${status}. Re-opening as pending due to new distress signal.");
+          debugPrint("Incident was $status. Re-opening as pending due to new distress signal.");
           return existingId;
         } else {
 
-          print("Incident is $status — same TTN signal, skipping.");
+          debugPrint("Incident is $status — same TTN signal, skipping.");
           return null;
         }
       }
@@ -260,7 +309,7 @@ class DatabaseService {
       }
       return null;
     } catch (e) {
-      print("Error fetching any incident by device: $e");
+      debugPrint("Error fetching any incident by device: $e");
       return null;
     }
   }
@@ -290,7 +339,7 @@ class DatabaseService {
 
       return null;
     } catch (e) {
-      print("Error fetching incident by device: $e");
+      debugPrint("Error fetching incident by device: $e");
       return null;
     }
   }
@@ -369,7 +418,7 @@ class DatabaseService {
       }
       return null;
     } catch (e) {
-      print("Error fetching device info: $e");
+      debugPrint("Error fetching device info: $e");
       return null;
     }
   }
@@ -516,7 +565,7 @@ class DatabaseService {
 
           return duplicates;
         } catch (e) {
-          print('Firebase error while checking for team duplicates: $e');
+          debugPrint('Firebase error while checking for team duplicates: $e');
           return duplicates;
         }
       }
@@ -574,7 +623,7 @@ class DatabaseService {
 
       return duplicates;
     } catch (e) {
-      print('Firebase error while checking for duplicates: $e');
+      debugPrint('Firebase error while checking for duplicates: $e');
       return duplicates;
     }
   }
@@ -606,7 +655,7 @@ class DatabaseService {
 
       return duplicates;
     } catch (e) {
-      print('Firebase error while checking for device duplicates: $e');
+      debugPrint('Firebase error while checking for device duplicates: $e');
       return duplicates;
     }
   }
@@ -639,7 +688,7 @@ class DatabaseService {
 
       return true; // ACDV ID is unique
     } catch (e) {
-      print('Firebase error while checking ACDV ID uniqueness: $e');
+      debugPrint('Firebase error while checking ACDV ID uniqueness: $e');
       return false; // Assume not unique on error
     }
   }
@@ -680,10 +729,10 @@ class DatabaseService {
       teamData['password'] = hashedPassword;
 
       await _db.child('teams').push().set(teamData);
-      print('Team created successfully');
+      debugPrint('Team created successfully');
       return {'success': true};
     } catch (e) {
-      print('Firebase error while creating team: $e');
+      debugPrint('Firebase error while creating team: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -697,10 +746,10 @@ class DatabaseService {
       }
 
         await _db.child('teams').child(teamId).child('members').push().set(memberData);
-        print('Member added to team $teamId successfully');
+        debugPrint('Member added to team $teamId successfully');
         return {'success': true};
       } catch (e) {
-        print('Firebase error adding team member: $e');
+        debugPrint('Firebase error adding team member: $e');
         return {'success': false};
       }
     }
@@ -722,7 +771,7 @@ class DatabaseService {
       });
       return teamNames;
     } catch (e) {
-      print('Firebase error fetching team names: $e');
+      debugPrint('Firebase error fetching team names: $e');
       return [];
     }
   }
@@ -745,7 +794,7 @@ class DatabaseService {
         });
         return teamsList;
       } catch (e) {
-        print('Firebase error fetching teams: $e');
+        debugPrint('Firebase error fetching teams: $e');
         return [];
       }
     }
@@ -767,7 +816,7 @@ class DatabaseService {
 
       return membersList; 
     } catch (e) {
-      print('Error fetching members: $e');
+      debugPrint('Error fetching members: $e');
       return [];
     }
   }
@@ -778,9 +827,9 @@ class DatabaseService {
     try {
       // Navigate to the correct path 'teams/[teamId]/members/[memberId]' and remove the data.
       await _db.child('teams').child(teamId).child('members').child(memberId).remove();
-      print('Member $memberId deleted from team $teamId successfully');
+      debugPrint('Member $memberId deleted from team $teamId successfully');
     } catch (e) {
-      print('Firebase error deleting team member: $e');
+      debugPrint('Firebase error deleting team member: $e');
     }
   }
     
@@ -788,9 +837,9 @@ class DatabaseService {
   Future<void> deleteTeam(String teamId) async {
     try {
       await _db.child('teams').child(teamId).remove();
-      print('Team with ID $teamId deleted successfully');
+      debugPrint('Team with ID $teamId deleted successfully');
     } catch (e) {
-      print('Firebase error deleting team: $e');
+      debugPrint('Firebase error deleting team: $e');
     }
   }
 
@@ -801,7 +850,7 @@ class DatabaseService {
       DatabaseEvent event = await _db.child('teams').child(teamId).once();
 
       if (event.snapshot.value == null) {
-        print('Team not found');
+        debugPrint('Team not found');
         return false;
       }
 
@@ -810,7 +859,7 @@ class DatabaseService {
 
       // Verify the old password
       if (!BCrypt.checkpw(oldPassword, storedPassword)) {
-        print('Incorrect old password');
+        debugPrint('Incorrect old password');
         return false;
       }
 
@@ -818,10 +867,10 @@ class DatabaseService {
       final hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
       await _db.child('teams').child(teamId).update({'password': hashedPassword});
 
-      print('Password changed successfully for team ID: $teamId');
+      debugPrint('Password changed successfully for team ID: $teamId');
       return true;
     } catch (e) {
-      print('Firebase error changing team password: $e');
+      debugPrint('Firebase error changing team password: $e');
       return false;
     }
   }
@@ -842,7 +891,7 @@ class DatabaseService {
       DatabaseEvent event = await _db.child('admins').child(adminId).once();
 
       if (event.snapshot.value == null) {
-        print('Admin not found');
+        debugPrint('Admin not found');
         return false;
       }
 
@@ -851,7 +900,7 @@ class DatabaseService {
 
       // Verify the old password
       if (!BCrypt.checkpw(oldPassword, storedPassword)) {
-        print('Incorrect old password');
+        debugPrint('Incorrect old password');
         return false;
       }
 
@@ -859,10 +908,10 @@ class DatabaseService {
       final hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
       await _db.child('admins').child(adminId).update({'password': hashedPassword});
 
-      print('Password changed successfully for admin ID: $adminId');
+      debugPrint('Password changed successfully for admin ID: $adminId');
       return true;
     } catch (e) {
-      print('Firebase error changing password: $e');
+      debugPrint('Firebase error changing password: $e');
       return false;
     }
   }
@@ -882,10 +931,10 @@ class DatabaseService {
 
       await _db.child('admins').push().set(adminData);
 
-      print('Admin created successfully');
+      debugPrint('Admin created successfully');
       return {'success': true}; // Indicate success with a map
     } catch (e) {
-      print('Firebase error while creating admin: $e');
+      debugPrint('Firebase error while creating admin: $e');
       return {'success': false}; // Indicate failure with a map
     }
   }
@@ -907,7 +956,7 @@ class DatabaseService {
       });
       return adminsList;
     } catch (e) {
-      print('Firebase error fetching admins: $e');
+      debugPrint('Firebase error fetching admins: $e');
       return [];
     }
   }
@@ -916,9 +965,9 @@ class DatabaseService {
   Future<void> deleteAdmin(String adminId) async {
     try {
       await _db.child('admins').child(adminId).remove();
-      print('Admin with ID $adminId deleted successfully');
+      debugPrint('Admin with ID $adminId deleted successfully');
     } catch (e) {
-      print('Firebase error deleting admin: $e');
+      debugPrint('Firebase error deleting admin: $e');
     }
   }
 
@@ -938,10 +987,10 @@ class DatabaseService {
 
       // If no duplicates, save device
       await _db.child('devices').push().set(deviceData);
-      print('Device created successfully');
+      debugPrint('Device created successfully');
       return {'success': true};
     } catch (e) {
-      print('Firebase error while creating device: $e');
+      debugPrint('Firebase error while creating device: $e');
       return {'success': false};
     }
   }
@@ -963,7 +1012,7 @@ class DatabaseService {
       });
       return devicesList;
     } catch (e) {
-      print('Firebase error fetching devices: $e');
+      debugPrint('Firebase error fetching devices: $e');
       return [];
     }
   }
@@ -972,9 +1021,9 @@ class DatabaseService {
   Future<void> deleteDevice(String deviceId) async {
     try {
       await _db.child('devices').child(deviceId).remove();
-      print('Device with ID $deviceId deleted successfully');
+      debugPrint('Device with ID $deviceId deleted successfully');
     } catch (e) {
-      print('Firebase error deleting device: $e');
+      debugPrint('Firebase error deleting device: $e');
     }
   }
 
@@ -1019,7 +1068,7 @@ class DatabaseService {
         return {'success': false, 'message': 'Invalid username or password.'};
       }
     } catch (e) {
-      print('Error during $type login: $e');
+      debugPrint('Error during $type login: $e');
       return {'success': false, 'message': 'An unexpected error occurred.'};
     }
   }

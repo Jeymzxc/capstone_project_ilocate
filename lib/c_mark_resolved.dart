@@ -1,7 +1,13 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:ilocate/g_rescuer_navigation.dart';
+import 'models/maps_const.dart'; 
 import 'database/firebase_db.dart';
 import 'package:intl/intl.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart' as polyline;
 
 class MarkResolved extends StatefulWidget {
   final String incidentId;
@@ -19,6 +25,33 @@ class _MarkResolvedState extends State<MarkResolved> {
 
   bool _isDetailsExpanded = true;
   bool _isLoading = true;
+  bool _isMapReady = false;
+  bool _isFollowingRescuer = false;
+
+  // For route following and google maps calculation
+  double _rescuerBearing = 0.0; 
+  LatLng? _lastRescuerLocation;  
+
+
+
+  // Map controller
+  final Completer<GoogleMapController> _mapController = Completer();
+
+  // Rescuer's real-time location
+  LatLng? _rescuerLocation;
+  LatLng? _victimLocation;
+
+  Timer? _routeDebounceTimer;
+  StreamSubscription<Position>? _positionStreamSubscription; 
+
+  final Set<Polyline> _polylines = {};
+  List<LatLng> _polylineCoordinates = [];
+
+  // State for route info display
+  String? _routeDistance;
+  String? _routeDuration;
+
+
 
   // User details
   String? _fullName;
@@ -31,6 +64,17 @@ class _MarkResolvedState extends State<MarkResolved> {
   void initState() {
     super.initState();
     _fetchUserDetails();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _getRescuerLocation();
+    });
+  }
+
+  @override
+  void dispose() {
+    _positionStreamSubscription?.cancel(); 
+    _routeDebounceTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _fetchUserDetails() async {
@@ -54,6 +98,310 @@ class _MarkResolvedState extends State<MarkResolved> {
         });
       }
     }
+  }
+
+  // Get Rescuer's Current Location (Phone Holder)
+  Future<void> _getRescuerLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    try {
+      // --- Fast initial fix ---
+      final initialPosition = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 5),
+        ),
+      );
+
+      if (mounted && _rescuerLocation == null) {
+        _rescuerLocation = LatLng(initialPosition.latitude, initialPosition.longitude);
+
+        setState(() {}); // Update UI
+
+        // Once we have rescuer location, create route and zoom
+        await _createRoute();
+        await _zoomToFitMarkers();
+      }
+    } catch (e) {
+      debugPrint("⚠️ Could not get initial rescuer location: $e");
+    }
+
+    // --- Continuous updates ---
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 50,
+    );
+
+    _positionStreamSubscription = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen((Position position) async {
+      final newRescuerLocation = LatLng(position.latitude, position.longitude);
+
+      if (_lastRescuerLocation != null) {
+        _rescuerBearing = _calculateBearing(_lastRescuerLocation!, newRescuerLocation);
+      }
+      _lastRescuerLocation = newRescuerLocation;
+
+      if (mounted) setState(() => _rescuerLocation = newRescuerLocation);
+
+      // Animate camera if following rescuer
+      if (_isFollowingRescuer && mounted) {
+        final GoogleMapController controller = await _mapController.future;
+        controller.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: _rescuerLocation!,
+              zoom: 16,
+              bearing: _rescuerBearing,
+            ),
+          ),
+        );
+      }
+
+      // --- Off-route check ---
+      if (_polylineCoordinates.isNotEmpty) {
+        final nearestPoint = _polylineCoordinates.reduce((a, b) {
+          final distA = Geolocator.distanceBetween(
+            a.latitude, a.longitude,
+            newRescuerLocation.latitude, newRescuerLocation.longitude,
+          );
+          final distB = Geolocator.distanceBetween(
+            b.latitude, b.longitude,
+            newRescuerLocation.latitude, newRescuerLocation.longitude,
+          );
+          return distA < distB ? a : b;
+        });
+
+        final deviation = Geolocator.distanceBetween(
+          nearestPoint.latitude, nearestPoint.longitude,
+          newRescuerLocation.latitude, newRescuerLocation.longitude,
+        );
+
+        if (deviation > 100) { 
+          debugPrint("🚨 Off-route! Recalculating...");
+          await _createRoute();
+          _zoomToFitMarkers();
+          return;
+        }
+      }
+
+      // --- Debounced periodic route refresh ---
+      _routeDebounceTimer?.cancel();
+      _routeDebounceTimer = Timer(const Duration(seconds: 30), () async {
+        await _createRoute();
+        _zoomToFitMarkers();
+      });
+
+    }, onError: (e) {
+      debugPrint("❌ Rescuer location stream error: $e");
+    });
+  }
+
+
+  Future<void> _createRoute() async {
+    if (_rescuerLocation == null || _victimLocation == null) {
+      debugPrint("❌ Rescuer & Victim location is not available yet.");
+      return;
+    }
+
+    try {
+      final polyline.PolylinePoints polylinePoints = polyline.PolylinePoints(apiKey: GOOGLE_MAPS_API_KEY);
+
+      polyline.RoutesApiRequest request = polyline.RoutesApiRequest(
+        origin: polyline.PointLatLng(_rescuerLocation!.latitude, _rescuerLocation!.longitude,),
+        destination: polyline.PointLatLng(_victimLocation!.latitude, _victimLocation!.longitude,),
+        travelMode: polyline.TravelMode.driving,
+        routingPreference: polyline.RoutingPreference.trafficAware, 
+      );
+
+      polyline.RoutesApiResponse response = await polylinePoints.getRouteBetweenCoordinatesV2(
+        request: request,
+      );
+
+      if (response.routes.isNotEmpty) {
+        polyline.Route route = response.routes.first;
+
+        // Format the distance and duration from the route object
+        final String distance = route.distanceKm != null ? "${route.distanceKm!.toStringAsFixed(1)} km" : "N/A";
+        final String duration = route.durationMinutes != null ? "${route.durationMinutes!.round()} min" : "N/A";
+
+        debugPrint("🛣 Distance: $distance, ⏱ Duration: $duration");
+
+        List<polyline.PointLatLng> points = route.polylinePoints ?? [];
+
+        if (points.isNotEmpty) {
+          final List<LatLng> routePoints =
+              points.map((p) => LatLng(p.latitude, p.longitude)).toList();
+
+          setState(() {
+            _polylineCoordinates = routePoints;
+            _polylines.clear();
+            _polylines.add(Polyline(
+              polylineId: const PolylineId("route"),
+              color: Colors.blue,
+              width: 5,
+              points: _polylineCoordinates,
+            ));
+            _routeDistance = distance;
+            _routeDuration = duration;
+            _isMapReady = true;
+             
+          });
+
+        } else {
+          debugPrint("⚠️ No polyline points in this route.");
+          _setFallbackRoute(distance: distance, duration: duration);
+        }
+      } else {
+        debugPrint("⚠️ No routes found in API response.");
+        _setFallbackRoute();
+      }
+    } catch (e) {
+      debugPrint("❌ Error calling Routes API: $e");
+      _setFallbackRoute();
+    }
+  }
+
+  // Fallback: simple straight line polyline for API errors/no routes
+  void _setFallbackRoute({String? distance, String? duration}) {
+    // Calculate geodesic distance if the API didn't provide it
+    double? fallbackDistanceKm;
+    if (_rescuerLocation != null) {
+      fallbackDistanceKm = Geolocator.distanceBetween(
+        _rescuerLocation!.latitude, 
+        _rescuerLocation!.longitude,
+        _victimLocation!.latitude,
+        _victimLocation!.longitude,
+      ) / 1000;
+    }
+    
+    // Use API result if available, otherwise use fallback calculation and mark it
+    final finalDistance = distance ?? (fallbackDistanceKm != null ? "${fallbackDistanceKm.toStringAsFixed(1)} km (direct)" : "N/A");
+    
+    // Duration cannot be reliably calculated without the API
+    final finalDuration = duration ?? 'N/A';
+
+    if (mounted) {
+      setState(() {
+        _polylineCoordinates = [
+          _rescuerLocation!,
+          LatLng(_victimLocation!.latitude, _victimLocation!.longitude),
+        ];
+        _polylines.clear();
+        _polylines.add(Polyline(
+          polylineId: const PolylineId("route_fallback"),
+          color: Colors.red.shade300, // Use a different color for fallback
+          width: 3,
+          points: _polylineCoordinates,
+        ));
+        
+        _routeDistance = finalDistance;
+        _routeDuration = finalDuration;
+      });
+    }
+  }
+
+
+  Future<void> _zoomToFitMarkers() async {
+    if (_rescuerLocation == null) return;
+
+    final GoogleMapController controller = await _mapController.future;
+
+    LatLngBounds bounds = LatLngBounds(
+      southwest: LatLng(
+        (_rescuerLocation!.latitude <= _victimLocation!.latitude)
+            ? _rescuerLocation!.latitude
+            : _victimLocation!.latitude,
+        (_rescuerLocation!.longitude <= _victimLocation!.longitude)
+            ? _rescuerLocation!.longitude
+            : _victimLocation!.longitude,
+      ),
+      northeast: LatLng(
+        (_rescuerLocation!.latitude > _victimLocation!.latitude)
+            ? _rescuerLocation!.latitude
+            : _victimLocation!.latitude,
+        (_rescuerLocation!.longitude > _victimLocation!.longitude)
+            ? _rescuerLocation!.longitude
+            : _victimLocation!.longitude,
+      ),
+    );
+
+    controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 70));
+  }
+
+
+  void _onMapCreated(GoogleMapController controller) {
+    if (!_mapController.isCompleted) {
+      _mapController.complete(controller);
+    }
+  }
+
+  // --- UI Helper Widgets ---
+
+  // New widget to display route distance and time prominently
+  Widget _buildRouteInfoCard() {
+    if (_routeDistance == null || _routeDuration == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(top: 16.0, left: 16.0, right: 16.0),
+      elevation: 6,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min, // Wrap content horizontally
+          children: [
+            // Duration (Time)
+            Icon(Icons.access_time, color: ilocateRed, size: 24),
+            const SizedBox(width: 8.0),
+            Text(
+              _routeDuration!,
+              style: TextStyle(
+                fontSize: 18.0,
+                fontWeight: FontWeight.bold,
+                color: ilocateRed,
+              ),
+            ),
+            
+            const SizedBox(width: 16.0),
+            
+            // Separator
+            Container(width: 1, height: 20, color: Colors.grey[300]),
+
+            const SizedBox(width: 16.0),
+
+            // Distance
+            Icon(Icons.directions_car, color: ilocateRed, size: 24),
+            const SizedBox(width: 8.0),
+            Text(
+              _routeDistance!,
+              style: const TextStyle(
+                fontSize: 18.0,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Calculate marker
+  double _calculateBearing(LatLng start, LatLng end) {
+    final lat1 = start.latitude * pi / 180;
+    final lon1 = start.longitude * pi / 180;
+    final lat2 = end.latitude * pi / 180;
+    final lon2 = end.longitude * pi / 180;
+
+    final dLon = lon2 - lon1;
+    final y = sin(dLon) * cos(lat2);
+    final x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon);
+    double bearing = atan2(y, x) * 180 / pi; // Convert to degrees
+    return (bearing + 360) % 360; // Normalize 0-360
   }
 
   String _calculateAge(String dateString) {
@@ -338,6 +686,33 @@ void _showMarkResolvedConfirmationDialog(BuildContext context, String incidentId
             final heartRate = value['heartRate']?.toString() ?? 'N/A';
             final latitude = value['latitude']?.toString() ?? 'N/A';
             final longitude = value['longitude']?.toString() ?? 'N/A';
+
+            if (value['latitude'] != null && value['longitude'] != null) {
+              final newVictimLocation = LatLng(value['latitude'], value['longitude']);
+              
+              final distanceMoved = _victimLocation != null
+                  ? Geolocator.distanceBetween(
+                      _victimLocation!.latitude,
+                      _victimLocation!.longitude,
+                      newVictimLocation.latitude,
+                      newVictimLocation.longitude,
+                    )
+                  : double.infinity;
+
+              if (_victimLocation == null || distanceMoved > 50) {
+                _victimLocation = newVictimLocation;
+
+                _routeDebounceTimer?.cancel();
+                _routeDebounceTimer = Timer(const Duration(seconds: 10), () {
+                  if (_rescuerLocation != null) {
+                    _createRoute();
+                    _zoomToFitMarkers();
+                  }
+                });
+              }
+            }
+
+
             final location = 'Lat $latitude, Long $longitude';
 
             final ttnTimestamp = ttnData['timestamp'];
@@ -391,24 +766,123 @@ void _showMarkResolvedConfirmationDialog(BuildContext context, String incidentId
                 ),
                 centerTitle: true,
                 shape: const RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.vertical(bottom: Radius.circular(10)),
+                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(10)),
                 ),
               ),
-              body: Stack(
+              body: (_isLoading || !_isMapReady)
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(color: ilocateRed),
+                        const SizedBox(height: 16),
+                        Text(
+                          "Calculating location...",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                            color: ilocateRed,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+
+              : Stack(
                 children: [
                   // Map placeholder
                   Positioned.fill(
-                    child: Container(
-                      color: Colors.grey[200],
-                      child: const Center(
-                        child: Text(
-                          'Map will be displayed here',
-                          style: TextStyle(fontSize: 18.0, color: Colors.black54),
-                        ),
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: LatLng(value['latitude'], value['longitude']),
+                        zoom: 12,
                       ),
+                      onMapCreated: _onMapCreated,
+                      onCameraMoveStarted: () {
+                        _isFollowingRescuer = false; 
+                      },
+                      polylines: _polylines,
+                      myLocationEnabled: false,
+                      myLocationButtonEnabled: false,
+                      zoomControlsEnabled: false,
+                      mapToolbarEnabled: false,
+                      markers: {
+                        if (_rescuerLocation != null)
+                          Marker(
+                            markerId: const MarkerId('rescuer'),
+                            position: _rescuerLocation!,
+                            infoWindow: const InfoWindow(title: "Rescuer's Location"),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                            rotation: _rescuerBearing, 
+                            anchor: const Offset(0.5, 0.5),
+                          ),
+                        if (value['latitude'] != null && value['longitude'] != null)
+                          Marker(
+                            markerId: const MarkerId('incident'),
+                            position: LatLng(value['latitude'], value['longitude']),
+                            infoWindow:  InfoWindow(
+                              title: _fullName ?? rescueeName,
+                              snippet: "Victim's Location",
+                              ),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                          ),
+                      },
                     ),
                   ),
+
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: _buildRouteInfoCard(),
+                  ),
+                ),
+                Positioned(
+                  bottom: 180,
+                  right: 16,
+                  child: Column(
+                    children: [
+                      FloatingActionButton(
+                        heroTag: "recenterBtn",
+                        backgroundColor: Colors.white,
+                        onPressed: () async {
+                          if (_rescuerLocation != null) {
+                            _isFollowingRescuer = true;
+
+                            final GoogleMapController controller = await _mapController.future;
+                            controller.animateCamera(
+                              CameraUpdate.newCameraPosition(
+                                CameraPosition(
+                                  target: _rescuerLocation!,
+                                  zoom: 16,
+                                  bearing: _rescuerBearing,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        elevation: 4,
+                        child: Transform.rotate(
+                          angle: _rescuerBearing * pi / 180,
+                          child: Icon(Icons.navigation, color: ilocateRed),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Recenter",
+                        style: TextStyle(
+                          color: ilocateRed,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+
+
                   // Bottom Card with Details
                   Positioned(
                     bottom: 0,
@@ -479,25 +953,17 @@ void _showMarkResolvedConfirmationDialog(BuildContext context, String incidentId
                                                   color: ilocateRed,
                                                 ),
                                               ),
-                                              const Divider(
-                                                color: Colors.grey,
-                                                height: 16,
-                                                thickness: 1,
-                                              ),
-                                              _buildDetailRow(
-                                                  'Rescuee Name', rescueeName),
-                                              _buildDetailRow(
-                                                  'Phone', _phone ?? 'N/A'),
-                                              _buildDetailRow(
-                                                  'Address', _address ?? 'N/A'),
+                                              const Divider(color: Colors.grey, height: 16, thickness: 1),
+                                              _buildDetailRow( 'Rescuee Name', rescueeName),
+                                              _buildDetailRow('Phone', _phone ?? 'N/A'),
+                                              _buildDetailRow('Address', _address ?? 'N/A'),
                                               _buildDetailRow(
                                                 'Age',
                                                 _dateOfBirth != null
                                                     ? _calculateAge(_dateOfBirth!)
                                                     : 'N/A',
                                               ),
-                                              _buildDetailRow(
-                                                  'Sex', _sex ?? 'N/A'),
+                                              _buildDetailRow('Sex', _sex ?? 'N/A'),
                                               const SizedBox(height: 16.0),
                                               Text(
                                                 'ALERT DETAILS',
@@ -512,14 +978,11 @@ void _showMarkResolvedConfirmationDialog(BuildContext context, String incidentId
                                                 height: 16,
                                                 thickness: 1,
                                               ),
-                                              _buildDetailRow(
-                                                  'Incident ID', incidentId),
+                                              _buildDetailRow('Incident ID', incidentId),
                                               _buildDetailRow('Date', date),
                                               _buildDetailRow('Time', time),
-                                              _buildDetailRow(
-                                                  'Location', location),
-                                              _buildDetailRow(
-                                                  'Heart Rate', heartRate),
+                                              _buildDetailRow('Location', location),
+                                              _buildDetailRow('Heart Rate', heartRate),
                                             ],
                                           )
                                         : null,
@@ -569,7 +1032,7 @@ void _showMarkResolvedConfirmationDialog(BuildContext context, String incidentId
         if (_isLoading)
           Positioned.fill(
             child: Container(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withValues(alpha: 0.3),
               child: const Center(
                 child: CircularProgressIndicator(color: Color(0xFFC70000)),
               ),

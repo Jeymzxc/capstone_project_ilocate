@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'models/alert.dart';
 import 'database/firebase_db.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class AlertsView extends StatefulWidget {
   final Alert alert;
@@ -53,7 +54,7 @@ class _AlertsViewState extends State<AlertsView> {
         });
       }
     } catch (e) {
-      print('Error fetching user details: $e');
+      debugPrint('Error fetching user details: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -93,12 +94,23 @@ class _AlertsViewState extends State<AlertsView> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+            ),
+          )
         ],
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -123,16 +135,28 @@ class _AlertsViewState extends State<AlertsView> {
           ? Center(child: CircularProgressIndicator(color: ilocateRed))
           : Stack(
               children: [
-                // Map Placeholder (replace with actual map later)
+                // Map Placeholder 
                 Positioned.fill(
-                  child: Container(
-                    color: Colors.grey[200],
-                    child: const Center(
-                      child: Text(
-                        'Map will be displayed here',
-                        style: TextStyle(fontSize: 18.0, color: Colors.black54),
-                      ),
+                  child: GoogleMap(
+                    mapType: MapType.normal,
+                    initialCameraPosition: CameraPosition(
+                       target: LatLng(_currentAlert.latitude, _currentAlert.longitude),
+                      zoom: 12,
                     ),
+                    markers: {
+                      Marker(
+                        markerId: const MarkerId("victim"),
+                        position: LatLng(_currentAlert.latitude, _currentAlert.longitude),
+                        infoWindow: InfoWindow(
+                          title: _fullName ?? _currentAlert.rescueeName,
+                          snippet: "Victim's Location",
+                        ),
+                        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                      ),
+                    },
+                    myLocationEnabled: false, 
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: false,
                   ),
                 ),
                 Positioned(

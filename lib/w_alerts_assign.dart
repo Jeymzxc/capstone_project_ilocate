@@ -51,7 +51,7 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
       _groupOptions = teamNames;
     });
   } catch (e) {
-    print('Error fetching team names: $e');
+    debugPrint('Error fetching team names: $e');
   }
 }
 
@@ -69,7 +69,7 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
         });
       }
     } catch (e) {
-      print('Error fetching user details: $e');
+      debugPrint('Error fetching user details: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -127,7 +127,7 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
             ),
           );
         } catch (e) {
-          print('Error assigning incident: $e');
+          debugPrint('Error assigning incident: $e');
           _showCustomDialog(
             title: 'Error',
             message: 'Failed to assign incident.',
