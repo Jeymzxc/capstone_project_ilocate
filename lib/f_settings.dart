@@ -5,6 +5,7 @@ import 'f_privacy_policy.dart';
 import 'f_change_password.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database/firebase_db.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class Settings extends StatefulWidget {
   final VoidCallback onNavigateToTeam;
@@ -64,6 +65,88 @@ class _SettingsState extends State<Settings> {
     return "${phone.substring(0, 4)}******${phone.substring(phone.length - 2)}";
   }
 
+  
+  // Logout Dialog
+  void _showLoadingDialog(BuildContext context) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.3), 
+      transitionDuration: const Duration(milliseconds: 250), 
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return PopScope(
+          canPop: false,
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: FadeTransition(
+              opacity: animation, 
+              child: Container(
+                color: Colors.white,
+                width: double.infinity,
+                height: double.infinity,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(color: ilocateRed),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Logging out...",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                          color: ilocateRed,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+    );
+  }
+
+
+  // Handles Rescuer Logout Process
+  Future<void> _logoutRescuer(BuildContext context) async {
+    _showLoadingDialog(context);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final teamId = prefs.getString('teamsId');
+
+      if (teamId != null) {
+        // Fetch rescuer’s team name from Firebase
+        final teamData = await _dbService.getSingleTeam(teamId);
+        final teamName = teamData?['teamName'];
+
+        if (teamName != null) {
+          await FirebaseMessaging.instance.unsubscribeFromTopic("rescuer_$teamName");
+          debugPrint("🚫 Rescuer unsubscribed from rescuer_$teamName");
+        }
+      }
+
+      // Clear stored session data
+      await prefs.clear();
+    } catch (e) {
+      debugPrint("Logout error: $e");
+    }
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).pop(); 
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const UserLogin()),
+    );
+  }
+
+  // Shows confirmation dialog before logout
   void _showLogoutConfirmationDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -97,7 +180,7 @@ class _SettingsState extends State<Settings> {
                               size: 32,
                             ),
                             const SizedBox(width: 8.0),
-                            Expanded( 
+                            Expanded(
                               child: Text(
                                 'LOGOUT CONFIRMATION',
                                 style: TextStyle(
@@ -105,7 +188,7 @@ class _SettingsState extends State<Settings> {
                                   fontWeight: FontWeight.bold,
                                   color: ilocateRed,
                                 ),
-                                overflow: TextOverflow.ellipsis, 
+                                overflow: TextOverflow.ellipsis,
                               ),
                             )
                           ],
@@ -139,16 +222,7 @@ class _SettingsState extends State<Settings> {
                             const SizedBox(width: 8.0),
                             ElevatedButton(
                               onPressed: () async {
-                                final prefs = await SharedPreferences.getInstance();
-                                await prefs.clear();
-
-                                if (!context.mounted) return;
-
-                                Navigator.of(context).pop();
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const UserLogin()),
-                                );
+                                await _logoutRescuer(context);
                               },
                               style: ElevatedButton.styleFrom(
                                 splashFactory: NoSplash.splashFactory,
@@ -175,6 +249,7 @@ class _SettingsState extends State<Settings> {
       },
     );
   }
+
 
   Widget buildSectionTitle(String title) {
     return Padding(

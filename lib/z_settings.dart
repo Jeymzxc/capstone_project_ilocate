@@ -6,6 +6,7 @@ import 'z_privacy_policy.dart';
 import 'z_manage_users.dart'; 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database/firebase_db.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class z_Settings extends StatefulWidget {
   const z_Settings({super.key});
@@ -62,6 +63,75 @@ class _z_SettingsState extends State<z_Settings> {
   String _maskPhone(String phone) {
     if (phone.length < 6) return phone;
     return "${phone.substring(0, 4)}******${phone.substring(phone.length - 2)}";
+  }
+
+  // Logout Dialog
+  void _showLoadingDialog(BuildContext context) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.3), 
+      transitionDuration: const Duration(milliseconds: 250), 
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return PopScope(
+          canPop: false,
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: FadeTransition(
+              opacity: animation, 
+              child: Container(
+                color: Colors.white,
+                width: double.infinity,
+                height: double.infinity,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(color: ilocateRed),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Logging out...",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                          color: ilocateRed,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+    );
+  }
+
+  // Handles Admin Logout Process
+  Future<void> _logoutAdmin(BuildContext context) async {
+    _showLoadingDialog(context);
+
+    try {
+      // Unsubscribe admin from distressAlerts
+      await FirebaseMessaging.instance.unsubscribeFromTopic("distressAlerts");
+      debugPrint("🚫 Admin unsubscribed from distressAlerts");
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('adminsId');
+    } catch (e) {
+      debugPrint("Logout error: $e");
+    }
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).pop();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const UserLogin()),
+    );
   }
 
   void _showLogoutConfirmationDialog(BuildContext context) {
@@ -138,12 +208,8 @@ class _z_SettingsState extends State<z_Settings> {
                             ),
                             const SizedBox(width: 8.0),
                             ElevatedButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const UserLogin()),
-                                );
+                              onPressed: () async {
+                                _logoutAdmin(context);
                               },
                               style: ElevatedButton.styleFrom(
                                 splashFactory: NoSplash.splashFactory,

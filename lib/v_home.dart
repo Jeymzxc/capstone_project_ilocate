@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'database/firebase_db.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'g_admin_navigation.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -11,7 +14,7 @@ class AdminHomePage extends StatefulWidget {
 
 class _AdminHomePageState extends State<AdminHomePage> {
   final DatabaseService _databaseService = DatabaseService();
-  final int _sosNotificationCount = 2;
+  int _sosNotificationCount = 0;
 
   static const LatLng _initialPosition = LatLng(14.0230, 121.0930);
   LatLng? _lastMarkerPosition;
@@ -19,12 +22,25 @@ class _AdminHomePageState extends State<AdminHomePage> {
   GoogleMapController? _mapController;
   final Set<Marker> _markers = {};
 
+  StreamSubscription<List<Map<String, dynamic>>>? _pendingSubscription; 
+  StreamSubscription<List<Map<String, dynamic>>>? _adminIncidentsSubscription; 
+
   @override
   void initState() {
     super.initState();
+    _subscribeToAlerts();
+
+    // Listen to pending incidents
+    _pendingSubscription = _databaseService.streamPendingIncidents().listen((incidents) {
+      if (mounted) {
+        setState(() {
+          _sosNotificationCount = incidents.length; 
+        });
+      }
+    });
 
     // Subscribe to distress data
-    _databaseService.streamAdminIncidents().listen((victims) async {
+    _adminIncidentsSubscription = _databaseService.streamAdminIncidents().listen((victims) async {
       final updatedMarkers = <Marker>{};
 
       for (var victim in victims) {
@@ -71,6 +87,23 @@ class _AdminHomePageState extends State<AdminHomePage> {
     });
   }
 
+  Future<void> _subscribeToAlerts() async {
+    try {
+      await FirebaseMessaging.instance.subscribeToTopic("distressAlerts");
+      debugPrint("📡 Admin subscribed to distressAlerts topic");
+    } catch (e) {
+      debugPrint("❌ Subscription failed: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    _pendingSubscription?.cancel();
+    _adminIncidentsSubscription?.cancel();
+    _mapController = null;
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     const Color ilocateRed = Color(0xFFC70000);
@@ -86,8 +119,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
             onMapCreated: (controller) {
               _mapController = controller;
             },
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
+            myLocationEnabled: false,
+            myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             markers: _markers,
           ),
@@ -114,10 +147,15 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 alignment: Alignment.center,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.warning_amber,
-                        size: 30, color: ilocateRed),
-                    onPressed: () =>
-                        debugPrint("SOS Button pressed by Admin"),
+                    icon: const Icon(Icons.warning_amber, size: 30, color: ilocateRed),
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AdminNavigationScreen(selectedIndex: 1),
+                        ),
+                      );
+                    },
                   ),
                   if (_sosNotificationCount > 0)
                     Positioned(

@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:ilocate/g_rescuer_navigation.dart';
 import 'database/firebase_db.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Home extends StatefulWidget {
@@ -14,7 +16,7 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   final DatabaseService _databaseService = DatabaseService();
-  final int _sosNotificationCount = 2;
+  int _sosNotificationCount = 0;
   String? _rescuerTeamName;
 
   static const LatLng _defaultPosition = LatLng(14.0230, 121.0930);
@@ -23,7 +25,12 @@ class _HomeState extends State<Home> {
   final Set<Marker> _markers = {};
   LatLng? _rescuerLocation;
 
+  // For getting the rescuer Location 
   StreamSubscription<Position>? _positionStreamSubscription; 
+
+  // For Streaming current incidents
+  StreamSubscription<List<Map<String, dynamic>>>? _alertSubscription;
+
 
   @override
   void initState() {
@@ -32,7 +39,18 @@ class _HomeState extends State<Home> {
     _loadTeamIdAndStreamIncidents();
   }
 
+  @override
+  void dispose() {
+    _positionStreamSubscription?.cancel(); 
+    _alertSubscription?.cancel();
+    super.dispose();
+  }
+   
+
   Future<void> _loadTeamIdAndStreamIncidents() async {
+    // Prevent reloading if already initialized
+    if (_rescuerTeamName != null) return;
+
     final prefs = await SharedPreferences.getInstance();
     final teamId = prefs.getString('teamsId');
 
@@ -40,6 +58,18 @@ class _HomeState extends State<Home> {
       final teamData = await _databaseService.getSingleTeam(teamId);
       if (mounted && teamData != null) {
         _rescuerTeamName = teamData['teamName'];
+        await _subscribeToAlerts(_rescuerTeamName!);
+      }
+      if (_rescuerTeamName != null) {
+        _alertSubscription = _databaseService
+            .streamRescuerIncidents(_rescuerTeamName!)
+            .listen((alertsData) {
+          if (mounted) {
+            setState(() {
+              _sosNotificationCount = alertsData.length;
+            });
+          }
+        });
       }
     }
 
@@ -183,10 +213,13 @@ class _HomeState extends State<Home> {
     });
   }
 
-  @override
-  void dispose() {
-    _positionStreamSubscription?.cancel(); 
-    super.dispose();
+  Future<void> _subscribeToAlerts(String teamName) async {
+    try {
+      await FirebaseMessaging.instance.subscribeToTopic("rescuer_$teamName");
+      debugPrint("📡 Subscribed to rescuer $teamName topic");
+    } catch (e) {
+      debugPrint("❌ Subscription failed: $e");
+    }
   }
 
   @override
@@ -210,7 +243,7 @@ class _HomeState extends State<Home> {
               }
             },
             myLocationEnabled: true,
-            myLocationButtonEnabled: true,
+            myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             markers: _markers,
           ),
@@ -238,7 +271,14 @@ class _HomeState extends State<Home> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.warning_amber, size: 30, color: ilocateRed),
-                    onPressed: () => debugPrint("SOS Button Pressed"),
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MainNavigationScreen(initialIndex: 1),
+                        ),
+                      );
+                    },
                   ),
                   if (_sosNotificationCount > 0)
                     Positioned(
