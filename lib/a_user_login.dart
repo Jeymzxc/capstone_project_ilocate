@@ -15,10 +15,10 @@ class _UserLoginState extends State<UserLogin> {
   // Define the custom red color used in the app
   final Color ilocateRed = const Color(0xFFC70000);
 
-  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  final FocusNode _usernameFocus = FocusNode();
+  final FocusNode _emailFocus = FocusNode();
   final FocusNode _passwordFocus = FocusNode();
 
   bool _obscurePassword = true;
@@ -26,9 +26,9 @@ class _UserLoginState extends State<UserLogin> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
-    _usernameFocus.dispose();
+    _emailFocus.dispose();
     _passwordFocus.dispose();
     super.dispose();
   }
@@ -116,13 +116,13 @@ class _UserLoginState extends State<UserLogin> {
   }
 
   void _handleLogin() async {
-    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim(); 
     final password = _passwordController.text;
 
-    if (username.isEmpty || password.isEmpty) {
+    if (email.isEmpty || password.isEmpty) {
       _showAlertDialog(
         'Missing Information',
-        'Please enter both your username and password to log in.',
+        'Please enter both your email and password to log in.',
         ilocateRed,
         Icons.help_outline,
       );
@@ -134,8 +134,8 @@ class _UserLoginState extends State<UserLogin> {
     });
 
     try {
-      // First try Admin login
-      final adminResult = await DatabaseService().loginUser('admins', username, password);
+      // 🟢 Try Admin login first
+      final adminResult = await DatabaseService().loginUser('admins', email, password);
 
       if (adminResult['success']) {
         await _showAlertDialog(
@@ -154,8 +154,8 @@ class _UserLoginState extends State<UserLogin> {
         return;
       }
 
-      // If not admin, try Team login
-      final teamResult = await DatabaseService().loginUser('teams', username, password);
+      // 🔵 If not admin, try Team login
+      final teamResult = await DatabaseService().loginUser('teams', email, password);
 
       if (teamResult['success']) {
         await _showAlertDialog(
@@ -174,10 +174,10 @@ class _UserLoginState extends State<UserLogin> {
         return;
       }
 
-      // If both fail
+      // 🔴 If both fail
       await _showAlertDialog(
         'Login Failed',
-        'Incorrect username/password. Please check your credentials again.',
+        'Incorrect email or password. Please check your credentials again.',
         ilocateRed,
         Icons.cancel,
       );
@@ -190,6 +190,7 @@ class _UserLoginState extends State<UserLogin> {
       }
     }
   }
+
 
     @override
     Widget build(BuildContext context) {
@@ -254,13 +255,13 @@ class _UserLoginState extends State<UserLogin> {
                           height: 60, 
                           child: TextField(
                             cursorColor: Colors.black87,
-                            controller: _usernameController,
-                            focusNode: _usernameFocus,
+                            controller: _emailController,
+                            focusNode: _emailFocus,
                             decoration: InputDecoration(
-                              labelText: 'Username',
+                              labelText: 'Email',
                               labelStyle: TextStyle(
-                                  color: _getLabelColor(_usernameFocus)),
-                              prefixIcon: Icon(Icons.person, color: _getLabelColor(_usernameFocus)),
+                                  color: _getLabelColor(_emailFocus)),
+                              prefixIcon: Icon(Icons.person, color: _getLabelColor(_emailFocus)),
                               focusedBorder: roundedBorder.copyWith(
                                 borderSide: BorderSide(color: ilocateRed, width: 2),
                               ),

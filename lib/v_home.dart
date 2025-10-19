@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'database/firebase_db.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'database/firebase_db.dart';
 import 'g_admin_navigation.dart';
 
 class AdminHomePage extends StatefulWidget {
@@ -22,48 +22,48 @@ class _AdminHomePageState extends State<AdminHomePage> {
   GoogleMapController? _mapController;
   final Set<Marker> _markers = {};
 
-  StreamSubscription<List<Map<String, dynamic>>>? _pendingSubscription; 
-  StreamSubscription<List<Map<String, dynamic>>>? _adminIncidentsSubscription; 
+  StreamSubscription<List<Map<String, dynamic>>>? _pendingSubscription;
 
   @override
   void initState() {
     super.initState();
     _subscribeToAlerts();
 
-    // Listen to pending incidents
-    _pendingSubscription = _databaseService.streamPendingIncidents().listen((incidents) {
-      if (mounted) {
-        setState(() {
-          _sosNotificationCount = incidents.length; 
-        });
-      }
-    });
+    // Listen to Pending Incidents Only
+    _pendingSubscription = _databaseService.streamPendingIncidents().listen((incidents) async {
+      if (!mounted) return;
 
-    // Subscribe to distress data
-    _adminIncidentsSubscription = _databaseService.streamAdminIncidents().listen((victims) async {
+      // Update SOS counter (number of pending incidents)
+      setState(() {
+        _sosNotificationCount = incidents.length;
+      });
+
+      // Prepare new marker set
       final updatedMarkers = <Marker>{};
 
-      for (var victim in victims) {
-        final devuid = victim["deviceId"];
-        final lat = victim["value"]["latitude"];
-        final lng = victim["value"]["longitude"];
-        final hr = victim["value"]["heartRate"];
+      for (var incident in incidents) {
+        final devuid = incident["deviceId"];
+        final lat = incident["value"]["latitude"];
+        final lng = incident["value"]["longitude"];
+        final hr = incident["value"]["heartRate"];
 
-        // Fetch wearer info
+        // Fetch wearer info by device UID
         final deviceInfo = await _databaseService.getDeviceInfoByDevuid(devuid);
-
         final fullname = deviceInfo?["fullname"] ?? "Unknown";
         final phone = deviceInfo?["phone"] ?? "N/A";
 
+        // Create map marker
         updatedMarkers.add(
           Marker(
             markerId: MarkerId(devuid),
             position: LatLng(lat, lng),
             infoWindow: InfoWindow(
-              title: fullname, // Wearer’s full name
+              title: fullname,
               snippet: "Heart Rate: $hr | Phone: $phone",
             ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueRed,
+            ),
             onTap: () {
               if (_mapController != null) {
                 _lastMarkerPosition = LatLng(lat, lng);
@@ -77,29 +77,27 @@ class _AdminHomePageState extends State<AdminHomePage> {
       }
 
       // Update markers on the map
-      if (mounted) {
-        setState(() {
-          _markers
-            ..clear()
-            ..addAll(updatedMarkers);
-        });
-      }
+      setState(() {
+        _markers
+          ..clear()
+          ..addAll(updatedMarkers);
+      });
     });
   }
 
+  // Subscribe to Firebase Cloud Messaging topic for new distress alerts
   Future<void> _subscribeToAlerts() async {
     try {
       await FirebaseMessaging.instance.subscribeToTopic("distressAlerts");
       debugPrint("📡 Admin subscribed to distressAlerts topic");
     } catch (e) {
-      debugPrint("❌ Subscription failed: $e");
+      debugPrint("❌ FCM subscription failed: $e");
     }
   }
 
   @override
   void dispose() {
     _pendingSubscription?.cancel();
-    _adminIncidentsSubscription?.cancel();
     _mapController = null;
     super.dispose();
   }
@@ -111,6 +109,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     return Scaffold(
       body: Stack(
         children: [
+          // 🗺 Google Map
           GoogleMap(
             initialCameraPosition: const CameraPosition(
               target: _initialPosition,
@@ -125,7 +124,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
             markers: _markers,
           ),
 
-          // SOS notification button (top left)
+          // 🚨 SOS Notification Button
           Positioned(
             top: 16.0,
             left: 16.0,
@@ -147,12 +146,14 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 alignment: Alignment.center,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.warning_amber, size: 30, color: ilocateRed),
+                    icon: const Icon(Icons.warning_amber,
+                        size: 30, color: ilocateRed),
                     onPressed: () {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const AdminNavigationScreen(selectedIndex: 1),
+                          builder: (context) =>
+                              const AdminNavigationScreen(selectedIndex: 1),
                         ),
                       );
                     },
@@ -189,7 +190,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
           ),
         ],
       ),
-      // Button to reset the camera position
+
+      // Button to recenter map
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.white,
         child: const Icon(Icons.my_location, color: Colors.black),

@@ -1,11 +1,12 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:bcrypt/bcrypt.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 
 
 class DatabaseService {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
 
   // --- INCIDENT MANAGEMENT FUNCTION ---
@@ -628,7 +629,7 @@ class DatabaseService {
     }
   }
 
-    // Check for duplicate phone and devUid (DEVICES SIDE)
+  // Check for duplicate phone and devUid (DEVICES SIDE)
   Future<Map<String, bool>> _checkDeviceDuplicates(Map<String, dynamic> deviceData) async {
     Map<String, bool> duplicates = {
       'phone': false,
@@ -699,14 +700,14 @@ class DatabaseService {
 
     // --- TEAM MANAGEMENT FUNCTION ---
 
-  // Creates New Team
+  // Creates New Team using Firebase Auth
   Future<Map<String, dynamic>> createTeam(Map<String, dynamic> teamData) async {
     try {
+      // Check duplicates like before
       Map<String, dynamic> duplicates = await _checkTeamDuplicates(teamData);
-      
-      // Create a list to store all duplicate ACDV IDs found
-      List<String> duplicateAcdvIds = [];
 
+      // Check for duplicate ACDV IDs among members
+      List<String> duplicateAcdvIds = [];
       final membersData = teamData['members'] as Map<String, dynamic>;
       for (var memberData in membersData.values) {
         final isUnique = await _isAcdvIdUnique(memberData['acdvId']);
@@ -714,8 +715,7 @@ class DatabaseService {
           duplicateAcdvIds.add(memberData['acdvId']);
         }
       }
-      
-      // Add the list of duplicate ACDV IDs to the duplicates map
+
       if (duplicateAcdvIds.isNotEmpty) {
         duplicates['acdvId'] = duplicateAcdvIds;
       }
@@ -724,18 +724,31 @@ class DatabaseService {
         return {'success': false, 'duplicates': duplicates};
       }
 
-      // Hash the password before saving
-      final hashedPassword = BCrypt.hashpw(teamData['password'], BCrypt.gensalt());
-      teamData['password'] = hashedPassword;
+      // Create Firebase Auth account for the team
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: teamData['email'],
+        password: teamData['password'],
+      );
 
-      await _db.child('teams').push().set(teamData);
-      debugPrint('Team created successfully');
-      return {'success': true};
+      final uid = userCredential.user!.uid;
+
+      // Remove plain password before saving to database
+      teamData.remove('password');
+
+      // Save team info in Realtime Database using the UID as key
+      await _db.child('teams').child(uid).set(teamData);
+
+      debugPrint('Team account created successfully');
+      return {'success': true, 'uid': uid};
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Auth error while creating team: ${e.message}');
+      return {'success': false, 'error': e.message};
     } catch (e) {
       debugPrint('Firebase error while creating team: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
+
 
     // Adds a new member to a specific team.
     Future<Map<String, dynamic>> addTeamMember(String teamId, Map<String, dynamic> memberData) async {
@@ -843,99 +856,122 @@ class DatabaseService {
     }
   }
 
-  // Change team password
-  Future<bool> changeTeamPassword(String teamId, String oldPassword, String newPassword) async {
+  // Change Team Password (Firebase Auth version)
+  Future<Map<String, dynamic>> changeTeamPassword(String oldPassword, String newPassword) async {
     try {
-      // Fetch the current team data by their ID
-      DatabaseEvent event = await _db.child('teams').child(teamId).once();
+      final user = FirebaseAuth.instance.currentUser;
 
-      if (event.snapshot.value == null) {
-        debugPrint('Team not found');
-        return false;
+      if (user == null) {
+        return {'success': false, 'message': 'No user is currently signed in.'};
       }
 
-      final teamData = Map<String, dynamic>.from(event.snapshot.value as Map);
-      final storedPassword = teamData['password'];
+      // 🔒 Step 1: Reauthenticate with the current (old) password
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: oldPassword,
+      );
 
-      // Verify the old password
-      if (!BCrypt.checkpw(oldPassword, storedPassword)) {
-        debugPrint('Incorrect old password');
-        return false;
+      await user.reauthenticateWithCredential(credential);
+
+      // 🔑 Step 2: Update to the new password
+      await user.updatePassword(newPassword);
+
+      debugPrint('Password changed successfully for team: ${user.email}');
+      return {'success': true};
+    } on FirebaseAuthException catch (e) {
+      String message = 'Failed to change password.';
+      if (e.code == 'wrong-password') {
+        message = 'The old password is incorrect.';
+      } else if (e.code == 'requires-recent-login') {
+        message = 'Please log in again before changing your password.';
       }
-
-      // Hash the new password and update the database
-      final hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-      await _db.child('teams').child(teamId).update({'password': hashedPassword});
-
-      debugPrint('Password changed successfully for team ID: $teamId');
-      return true;
+      debugPrint('Auth error changing team password: ${e.message}');
+      return {'success': false, 'message': message};
     } catch (e) {
-      debugPrint('Firebase error changing team password: $e');
-      return false;
+      debugPrint('Unexpected error changing team password: $e');
+      return {'success': false, 'message': 'An unexpected error occurred.'};
     }
   }
-
-
-
-
 
 
 
 
  // --- ADMIN MANAGEMENT FUNCTION ---
 
-  // Change admin password
-  Future<bool> changePassword(String adminId, String oldPassword, String newPassword) async {
+  
+  // Change Admin Password (Firebase Auth version)
+  Future<Map<String, dynamic>> changePassword(String oldPassword, String newPassword) async {
     try {
-      // Fetch the current admin data by their ID
-      DatabaseEvent event = await _db.child('admins').child(adminId).once();
+      final user = FirebaseAuth.instance.currentUser;
 
-      if (event.snapshot.value == null) {
-        debugPrint('Admin not found');
-        return false;
+      if (user == null) {
+        return {'success': false, 'message': 'No user is currently signed in.'};
       }
 
-      final adminData = Map<String, dynamic>.from(event.snapshot.value as Map);
-      final storedPassword = adminData['password'];
+      // 🔒 1️⃣ Re-authenticate the user first (required by Firebase)
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: oldPassword,
+      );
 
-      // Verify the old password
-      if (!BCrypt.checkpw(oldPassword, storedPassword)) {
-        debugPrint('Incorrect old password');
-        return false;
+      await user.reauthenticateWithCredential(credential);
+
+      // 🔑 2️⃣ Update the password
+      await user.updatePassword(newPassword);
+
+      debugPrint('Password changed successfully for user: ${user.email}');
+      return {'success': true};
+    } on FirebaseAuthException catch (e) {
+      String message = 'Failed to change password.';
+      if (e.code == 'wrong-password') {
+        message = 'The old password is incorrect.';
+      } else if (e.code == 'requires-recent-login') {
+        message = 'Please log in again before changing your password.';
       }
-
-      // Hash the new password and update the database
-      final hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-      await _db.child('admins').child(adminId).update({'password': hashedPassword});
-
-      debugPrint('Password changed successfully for admin ID: $adminId');
-      return true;
+      debugPrint('Auth error changing password: ${e.message}');
+      return {'success': false, 'message': message};
     } catch (e) {
-      debugPrint('Firebase error changing password: $e');
-      return false;
+      debugPrint('Unexpected error changing password: $e');
+      return {'success': false, 'message': 'An unexpected error occurred.'};
     }
   }
 
 
-
-
-  // Register Admin
+  // Register Admin using Firebase Auth
   Future<Map<String, dynamic>> createAdmin(Map<String, dynamic> adminData) async {
     try {
+      // Check duplicates in
       Map<String, bool> duplicates = await _checkDuplicates(adminData);
       if (duplicates.containsValue(true)) {
         return {'success': false, 'duplicates': duplicates};
       }
-      final hashedPassword = BCrypt.hashpw(adminData['password'], BCrypt.gensalt());
-      adminData['password'] = hashedPassword;
 
-      await _db.child('admins').push().set(adminData);
+      // Create the account in Firebase Authentication
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+        email: adminData['email'],
+        password: adminData['password'],
+      );
 
-      debugPrint('Admin created successfully');
-      return {'success': true}; // Indicate success with a map
+      // Get UID from Firebase Auth
+      final uid = userCredential.user!.uid;
+
+      // 4Remove password before saving to DB
+      adminData.remove('password');
+
+      // Store profile in Realtime Database under the UID
+      await _db.child('admins').child(uid).set(adminData);
+
+      debugPrint('Admin account created successfully');
+      return {'success': true, 'uid': uid};
+    } on FirebaseAuthException catch (e) {
+      // Firebase Auth-specific errors
+      debugPrint('Auth error while creating admin: ${e.message}');
+      return {'success': false, 'error': e.message};
     } catch (e) {
+      // General Firebase errors
       debugPrint('Firebase error while creating admin: $e');
-      return {'success': false}; // Indicate failure with a map
+      return {'success': false, 'error': e.toString()};
     }
   }
   
@@ -1031,42 +1067,57 @@ class DatabaseService {
 
    // --- LOGIN MANAGEMENT FUNCTION ---
 
-  // Login for both Rescuer and Admin
-  Future<Map<String, dynamic>> loginUser(String type, String username, String password) async {
+  // Login for both Admins and Teams
+  Future<Map<String, dynamic>> loginUser(String type, String email, String password) async {
     try {
-      // type: 'teams' or 'admins'
-      DatabaseEvent event = await _db.child(type).orderByChild('username').equalTo(username).once();
+      // Firebase Auth verifies credentials
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-      if (event.snapshot.value == null) {
-        return {'success': false, 'message': 'Invalid username or password.'};
-      }
+      final uid = userCredential.user!.uid;
 
-      final userMap = Map<dynamic, dynamic>.from(event.snapshot.value as Map);
-      final userId = userMap.keys.first;
-      final userData = Map<String, dynamic>.from(userMap[userId] as Map);
+      // Fetch the user profile from Realtime Database using UID
+      final snapshot = await _db.child('$type/$uid').get();
 
-      final storedHashedPassword = userData['password'];
-
-      if (BCrypt.checkpw(password, storedHashedPassword)) {
-        // Store ID in SharedPreferences
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('${type}Id', userId);
-
-          // Build response
-        final response = {
-          'success': true,
-          'id': userId,
-          'username': userData['username'],
+      if (!snapshot.exists) {
+        return {
+          'success': false,
+          'message': 'Profile not found in database.',
         };
-
-        if (type == 'teams') {
-          response['teamName'] = userData['teamName'];
-        }
-
-        return response;
-      } else {
-        return {'success': false, 'message': 'Invalid username or password.'};
       }
+
+      final userData = Map<String, dynamic>.from(snapshot.value as Map);
+
+      // Save UID to SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('${type}Id', uid);
+
+      // Build response
+      final response = {
+        'success': true,
+        'id': uid,
+        'username': userData['username'],
+      };
+
+      if (type == 'teams' && userData.containsKey('teamName')) {
+        response['teamName'] = userData['teamName'];
+      }
+
+      return response;
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = 'Login failed.';
+
+      if (e.code == 'user-not-found') {
+        errorMessage = 'No user found for that email.';
+      } else if (e.code == 'wrong-password') {
+        errorMessage = 'Incorrect password.';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'Invalid email format.';
+      }
+
+      return {'success': false, 'message': errorMessage};
     } catch (e) {
       debugPrint('Error during $type login: $e');
       return {'success': false, 'message': 'An unexpected error occurred.'};

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'database/firebase_db.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'a_user_login.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SettingsPassword extends StatefulWidget {
   const SettingsPassword({super.key});
@@ -118,12 +119,14 @@ class _SettingsPasswordState extends State<SettingsPassword> {
   }
 
   void _changePassword() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    // Check if new and verify passwords match
-    if (_newPasswordController.text != _verifyPasswordController.text) {
+    final oldPassword = _currentPasswordController.text.trim();
+    final newPassword = _newPasswordController.text.trim();
+    final verifyPassword = _verifyPasswordController.text.trim();
+
+    // 🧩 Validate that the new and verify passwords match
+    if (newPassword != verifyPassword) {
       _showAlertDialog(
         'Password Mismatch',
         'The new passwords you entered don\'t match. Please retype both fields to continue.',
@@ -132,52 +135,35 @@ class _SettingsPasswordState extends State<SettingsPassword> {
       return;
     }
 
-        // Prevent using the same password as the current one
-    if (_currentPasswordController.text == _newPasswordController.text) {
+    // 🚫 Prevent reusing the same password
+    if (oldPassword == newPassword) {
       _showAlertDialog(
         'Invalid Password',
-        'The new password cannot be the same as the current password. Please choose a different one.',
+        'The new password cannot be the same as the current password. Please choose a different password.',
         ilocateRed,
       );
       return;
     }
-    
-    setState(() {
-      _isLoading = true;
-    });
+
+    setState(() => _isLoading = true);
 
     try {
-      // Get the team ID from SharedPreferences (similar to admin)
-      final prefs = await SharedPreferences.getInstance();
-      final String? teamId = prefs.getString('teamsId');
+      // ✅ Call your new Firebase Auth version
+      final result = await _databaseService.changeTeamPassword(oldPassword, newPassword);
 
-      if (teamId == null) {
-        _showAlertDialog(
-          'Authentication Error',
-          'Team ID not found. Please log in again.',
-          ilocateRed,
-        );
-        return;
-      }
-
-      // Call your new function
-      bool success = await _databaseService.changeTeamPassword(
-        teamId,
-        _currentPasswordController.text,
-        _newPasswordController.text,
-      );
-
-      if (success) {
+      if (result['success'] == true) {
+        // 🟢 Success message
         _showAlertDialog(
           'Success',
           'Password successfully changed! Please log in again.',
           Colors.green,
           onOk: () async {
-            // Clear stored session
+            // Clear session and log out
             final prefs = await SharedPreferences.getInstance();
             await prefs.clear();
 
-            // Navigate to login screen and clear backstack
+            await FirebaseAuth.instance.signOut();
+
             if (mounted) {
               Navigator.pushAndRemoveUntil(
                 context,
@@ -188,29 +174,29 @@ class _SettingsPasswordState extends State<SettingsPassword> {
           },
         );
 
-        // Clear text fields
+        // 🧹 Clear text fields
         _currentPasswordController.clear();
         _newPasswordController.clear();
         _verifyPasswordController.clear();
       } else {
+        // 🔴 Error message from service
         _showAlertDialog(
           'Failed to Change Password',
-          'The current password you entered is incorrect. Please try again.',
+          result['message'] ?? 'Unable to change password. Please try again.',
           ilocateRed,
         );
       }
     } catch (e) {
       _showAlertDialog(
         'Error',
-        'An error occurred: ${e.toString()}',
+        'An unexpected error occurred: ${e.toString()}',
         ilocateRed,
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
+
 
   // This function is the validator for the new password text field
   String? _validatePassword(String? value) {
