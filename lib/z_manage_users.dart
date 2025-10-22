@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'z_settings_add_admin.dart';
 import 'z_register_device.dart';
 import 'z_admin_details.dart';
 import 'z_device_details.dart';
+import 'a_user_login.dart';
 import 'database/firebase_db.dart';
 
 class z_settingsManageUsers extends StatefulWidget {
@@ -33,7 +35,8 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
 
   Future<void> _fetchAdmins() async {
     try {
-      final List<Map<String, dynamic>> fetchedAdmins = await _dbService.getAdmins();
+      final List<Map<String, dynamic>> fetchedAdmins =
+          await _dbService.getAdmins();
       setState(() {
         _admins = fetchedAdmins;
         _isLoadingAdmins = false;
@@ -48,7 +51,8 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
 
   Future<void> _fetchDevices() async {
     try {
-      final List<Map<String, dynamic>> fetchedDevices = await _dbService.getDevices();
+      final List<Map<String, dynamic>> fetchedDevices =
+          await _dbService.getDevices();
       setState(() {
         _devices = fetchedDevices;
         _isLoadingDevices = false;
@@ -61,19 +65,90 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
     }
   }
 
-  void _showAlertDialog(String title, String message, Color headerColor) {
+  // 🔹 Custom Dialog (consistent with your style)
+  void _showCustomDialog({
+    required String title,
+    required String message,
+    required Color headerColor,
+    required IconData icon,
+    bool isSuccess = false,
+  }) {
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(title, style: TextStyle(color: headerColor)),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('OK', style: TextStyle(color: ilocateRed)),
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: headerColor),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(icon, color: headerColor, size: 32),
+                            const SizedBox(width: 8.0),
+                            Text(
+                              title.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 20.0,
+                                fontWeight: FontWeight.bold,
+                                color: headerColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8.0),
+                        Text(
+                          message,
+                          style: const TextStyle(fontSize: 14.0),
+                        ),
+                        const SizedBox(height: 24.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                if (isSuccess) {
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => const UserLogin()),
+                                    (route) => false,
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: headerColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                              ),
+                              child: const Text(
+                                'OK',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         );
       },
     );
@@ -129,7 +204,8 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.0),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
               onPressed: () {
                 Navigator.of(context).pop(false);
@@ -145,7 +221,8 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.0),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
               onPressed: () {
                 Navigator.of(context).pop(true);
@@ -163,7 +240,7 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack( 
+    return Stack(
       children: [
         DefaultTabController(
           length: 2,
@@ -202,18 +279,17 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
             ),
             body: TabBarView(
               children: [
-                // Manage Admins Tab
+                // Admin Management Tab
                 _buildManagementTab(
                   title: 'Admins',
                   items: _admins,
                   onAdd: () async {
                     final result = await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const z_settingsAdd()),
+                      MaterialPageRoute(
+                          builder: (context) => const z_settingsAdd()),
                     );
-                    if (result != null) {
-                      _fetchAdmins();
-                    }
+                    if (result != null) _fetchAdmins();
                   },
                   onDelete: (index) async {
                     final shouldDelete = await _showConfirmationDialog(
@@ -222,19 +298,47 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
                     );
 
                     if (shouldDelete == true) {
-                      setState(() {
-                        _isDeleting = true; // Show loader
-                      });
+                      setState(() => _isDeleting = true);
 
-                      final adminId = _admins[index]['id'] as String;
-                      await _dbService.deleteAdmin(adminId);
-                      await _fetchAdmins();
+                      try {
+                        final currentUser = FirebaseAuth.instance.currentUser;
+                        final adminId = _admins[index]['id'] as String;
 
-                      setState(() {
-                        _isDeleting = false; // Hide loader
-                      });
+                        // Delete any admin account (super admin privilege)
+                        await _dbService.deleteAdmin(adminId);
+                        await _fetchAdmins();
 
-                      _showAlertDialog('Admin Deleted', 'Admin has been successfully deleted.', Colors.red);
+                        setState(() => _isDeleting = false);
+
+                        // If the deleted account is your own, log out and redirect
+                        if (currentUser != null && currentUser.uid == adminId) {
+                          await FirebaseAuth.instance.signOut();
+                          _showCustomDialog(
+                            title: 'Account Deleted',
+                            message:
+                                'Your admin account has been deleted. You will now be redirected to the login screen.',
+                            headerColor: Colors.green,
+                            icon: Icons.check_circle_outline,
+                            isSuccess: true,
+                          );
+                        } else {
+                          _showCustomDialog(
+                            title: 'Admin Deleted',
+                            message:
+                                'The selected admin has been successfully deleted from the system.',
+                            headerColor: Colors.green,
+                            icon: Icons.check_circle_outline,
+                          );
+                        }
+                      } catch (e) {
+                        setState(() => _isDeleting = false);
+                        _showCustomDialog(
+                          title: 'Error',
+                          message: 'An error occurred while deleting the admin:\n$e',
+                          headerColor: Colors.red,
+                          icon: Icons.error_outline,
+                        );
+                      }
                     }
                   },
                   isLoading: _isLoadingAdmins,
@@ -248,18 +352,18 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
                     );
                   },
                 ),
-                // Manage Devices Tab
+
+                // Device Management Tab
                 _buildManagementTab(
                   title: 'Devices',
                   items: _devices,
                   onAdd: () async {
                     final result = await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const z_settingsRegister()),
+                      MaterialPageRoute(
+                          builder: (context) => const z_settingsRegister()),
                     );
-                    if (result != null) {
-                      _fetchDevices();
-                    }
+                    if (result != null) _fetchDevices();
                   },
                   onDelete: (index) async {
                     final shouldDelete = await _showConfirmationDialog(
@@ -268,19 +372,19 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
                     );
 
                     if (shouldDelete == true) {
-                      setState(() {
-                        _isDeleting = true; // Show loader
-                      });
-
+                      setState(() => _isDeleting = true);
                       final deviceId = _devices[index]['id'] as String;
                       await _dbService.deleteDevice(deviceId);
                       await _fetchDevices();
+                      setState(() => _isDeleting = false);
 
-                      setState(() {
-                        _isDeleting = false; // Hide loader
-                      });
-
-                      _showAlertDialog('Device Deleted', 'Device has been successfully deleted.', Colors.red);
+                      _showCustomDialog(
+                        title: 'Device Deleted',
+                        message:
+                            'Device has been successfully deleted from the system.',
+                        headerColor: Colors.green,
+                        icon: Icons.check_circle_outline,
+                      );
                     }
                   },
                   isLoading: _isLoadingDevices,
@@ -299,7 +403,6 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
           ),
         ),
 
-        // Fullscreen overlay loader for delete operation
         if (_isDeleting)
           Container(
             color: Colors.black54,
@@ -311,6 +414,7 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
     );
   }
 
+  // 🔹 Reusable tab builder
   Widget _buildManagementTab({
     required String title,
     required List<Map<String, dynamic>> items,
@@ -342,39 +446,44 @@ class _z_settingsManageUsersState extends State<z_settingsManageUsers> {
           const SizedBox(height: 24.0),
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator(color: ilocateRed,))
+                ? Center(
+                    child: CircularProgressIndicator(color: ilocateRed),
+                  )
                 : items.isEmpty
                     ? Center(
                         child: Text(
                           'No $title found.',
-                          style: const TextStyle(fontSize: 16, color: Colors.grey),
+                          style: const TextStyle(
+                              fontSize: 16, color: Colors.grey),
                         ),
                       )
                     : ListView.builder(
                         itemCount: items.length,
                         itemBuilder: (context, index) {
                           final item = items[index];
-                          final String displayKey = title == 'Admins' ? 'username' : 'devuid';
-                          final String displayTitle = item[displayKey] as String? ?? 'N/A';
+                          final String displayKey =
+                              title == 'Admins' ? 'username' : 'devuid';
+                          final String displayTitle =
+                              item[displayKey] as String? ?? 'N/A';
 
                           return Card(
                             elevation: 2,
-                            margin: const EdgeInsets.symmetric(vertical: 8.0),
+                            margin:
+                                const EdgeInsets.symmetric(vertical: 8.0),
                             child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(
+                                      horizontal: 16.0, vertical: 8.0),
                               title: Text(
                                 displayTitle,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
                               ),
-                              onTap: () {
-                                onTapItem(index);
-                              },
+                              onTap: () => onTapItem(index),
                               trailing: IconButton(
-                                icon: Icon(Icons.delete, color: ilocateRed),
-                                onPressed: () {
-                                  onDelete(index);
-                                },
-                              ),
+                                    icon: Icon(Icons.delete, color: ilocateRed),
+                                    onPressed: () => onDelete(index),
+                                  ),
                             ),
                           );
                         },

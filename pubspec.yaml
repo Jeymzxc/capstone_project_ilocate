@@ -14,13 +14,14 @@ dependencies:
   firebase_core: ^3.15.2                # Firebase SDK for Initialization
   firebase_database: ^11.0.0            # Firebase Realtime DB
   firebase_auth: ^5.3.1                 # Firebase Phone Auth
-  bcrypt: ^1.1.3                        # For hashing password
   shared_preferences: ^2.2.2            # For Saving Id on Login and Password Reset
   google_maps_flutter: ^2.5.0           # For Google Maps display
   geolocator: ^14.0.2                   # To get the rescuer's current location
   flutter_polyline_points: ^3.0.1       # To generate route points between rescuer and wearer
   firebase_messaging: ^15.1.3           # Firebase Cloud Messaging
   flutter_local_notifications: ^17.2.3  # For showing notifications in foreground
+  cloud_functions: ^5.0.4               # Cloud Functions
+  http: ^1.2.0                          # For making REST API calls
 
 dev_dependencies:
   flutter_test:

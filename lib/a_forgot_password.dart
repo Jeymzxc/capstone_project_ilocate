@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'a_user_login.dart';
+import 'models/hidden.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
 
 class ForgotPassword extends StatefulWidget {
   const ForgotPassword({super.key});
@@ -29,17 +33,43 @@ class _ForgotPasswordState extends State<ForgotPassword> {
     setState(() => _isLoading = true);
 
     try {
-      // ✅ No existence check — secure modern approach
+      // Check if email exists in Firebase Auth using Cloud Function
+      final response = await http.post(
+        Uri.parse('$baseUrl/check-email'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'email': email}),
+      );
+
+      final result = json.decode(response.body);
+
+      if (response.statusCode != 200) {
+        throw Exception('Server error: ${response.body}');
+      }
+
+      if (result['exists'] == false) {
+        setState(() => _isLoading = false);
+        _showCustomDialog(
+          title: 'Email Not Found',
+          message:
+              'No account is registered with:\n\n$email\n\n'
+              'Please double-check your email address or contact your Administrator\n'
+              'to register your account.',
+          headerColor: Colors.red,
+          icon: Icons.error_outline,
+        );
+        return; 
+      }
+
+      // Send Reset Email since the email exists
       await _auth.sendPasswordResetEmail(email: email);
 
       setState(() => _isLoading = false);
 
-      // Success dialog (universal)
+      // Success dialog
       _showCustomDialog(
         title: 'Check Your Email',
         message:
-            'If an account exists for:\n\n$email\n\nYou’ll receive a password reset link shortly.\n'
-            'Please check your Gmail inbox (and spam folder) to reset your password.',
+            'A password reset link has been sent to:\n\n$email\n\nPlease check your inbox (or spam folder).',
         headerColor: Colors.green,
         icon: Icons.email_outlined,
         isSuccess: true,
@@ -70,6 +100,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
       );
     }
   }
+
 
 
   // Reusable Custom Dialog
@@ -356,7 +387,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
             Container(
               color: Colors.black.withValues(alpha: 0.3),
               child: const Center(
-                child: CircularProgressIndicator(color: Colors.white),
+                child: CircularProgressIndicator(color: Color(0xFFC70000)),
               ),
             ),
         ],

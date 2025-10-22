@@ -222,7 +222,7 @@ class _x_teamAddState extends State<x_teamAdd> {
         final teamDetails = {
           'teamName': _teamNameController.text.trim(),
           'username': _usernameController.text.trim(),
-          'email': _emailController.text.trim(),
+          'email': _emailController.text.trim().toLowerCase(),
           'phoneNo': _phoneController.text.trim(),
           'password': _passwordController.text.trim(),
         };
@@ -660,7 +660,7 @@ class _x_teamAddState extends State<x_teamAdd> {
               }
               if (type == 'username') {
                 if (value.contains(' ') || value.length < 4) {
-                  return 'Username must be at least 4 characters and contain no spaces';
+                  return 'Username must be at least 4 characters and \ncontain no spaces';
                 }
               }
               if (type == 'email') {
@@ -672,7 +672,7 @@ class _x_teamAddState extends State<x_teamAdd> {
               if (type == 'phone') {
                 final bool isValid = RegExp(r"^(09|\+639)\d{9}$").hasMatch(value);
                 if (!isValid) {
-                  return 'Please enter a valid Philippine phone number (e.g., 09xxxxxxxxx)';
+                  return 'Please enter a valid Philippine phone number \n(e.g., 09xxxxxxxxx)';
                 }
               }
               if (type == 'password') {
@@ -703,7 +703,7 @@ class _x_teamAddState extends State<x_teamAdd> {
               errorStyle: const TextStyle(color: Colors.red),
               counterText: '',
               helperText: type == 'password'
-                  ? 'Password must be at least 8 characters long.\nInclude uppercase, lowercase, number, and a special character. \nExample: Password#123'
+                  ? 'Password must be at least 8 characters long.\nInclude uppercase, lowercase, number, and a\nspecial character. \nExample: Password#123'
                   : null,
               helperStyle: const TextStyle(
                 fontSize: 12.0,

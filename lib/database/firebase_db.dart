@@ -2,7 +2,11 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'dart:async';
+import 'package:ilocate/models/hidden.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 
 class DatabaseService {
@@ -848,13 +852,23 @@ class DatabaseService {
     
   // Deletes entire team.
   Future<void> deleteTeam(String teamId) async {
-    try {
-      await _db.child('teams').child(teamId).remove();
-      debugPrint('Team with ID $teamId deleted successfully');
-    } catch (e) {
-      debugPrint('Firebase error deleting team: $e');
+    final url = Uri.parse('$baseUrl/delete-team');
+    final headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': ADMIN_API_KEY,
+    };
+    final body = jsonEncode({'teamId': teamId});
+
+    final response = await http.post(url, headers: headers, body: body);
+
+    if (response.statusCode == 200) {
+      debugPrint('✅ Team deleted successfully from Cloud Function.');
+    } else {
+      debugPrint('❌ Failed to delete team: ${response.body}');
+      throw Exception('Failed to delete team.');
     }
   }
+
 
   // Change Team Password (Firebase Auth version)
   Future<Map<String, dynamic>> changeTeamPassword(String oldPassword, String newPassword) async {
@@ -937,44 +951,57 @@ class DatabaseService {
   }
 
 
-  // Register Admin using Firebase Auth
+  // Register Admin using Firebase Auth 
   Future<Map<String, dynamic>> createAdmin(Map<String, dynamic> adminData) async {
     try {
-      // Check duplicates in
+      // Check for duplicate email or username
       Map<String, bool> duplicates = await _checkDuplicates(adminData);
       if (duplicates.containsValue(true)) {
         return {'success': false, 'duplicates': duplicates};
       }
 
-      // Create the account in Firebase Authentication
-      final userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
+      // Create a completely separate Firebase App instance for temporary use
+      final FirebaseApp tempApp = await Firebase.initializeApp(
+        name: 'temporaryApp',
+        options: Firebase.app().options,
+      );
+
+      // Use a FirebaseAuth instance linked to that temporary app
+      final FirebaseAuth tempAuth = FirebaseAuth.instanceFor(app: tempApp);
+
+      // Create new admin account (does not affect current user session)
+      final userCredential = await tempAuth.createUserWithEmailAndPassword(
         email: adminData['email'],
         password: adminData['password'],
       );
 
-      // Get UID from Firebase Auth
-      final uid = userCredential.user!.uid;
+      final newUid = userCredential.user!.uid;
 
-      // 4Remove password before saving to DB
+      // Remove password before saving to database
       adminData.remove('password');
 
-      // Store profile in Realtime Database under the UID
-      await _db.child('admins').child(uid).set(adminData);
+      // Save admin details in Realtime Database
+      await _db.child('admins').child(newUid).set({
+        'id': newUid,
+        ...adminData,
+      });
 
-      debugPrint('Admin account created successfully');
-      return {'success': true, 'uid': uid};
+      // Sign out and delete temporary app to prevent memory leaks
+      await tempAuth.signOut();
+      await tempApp.delete();
+
+      debugPrint('✅ Admin account created successfully');
+      return {'success': true, 'uid': newUid};
     } on FirebaseAuthException catch (e) {
-      // Firebase Auth-specific errors
-      debugPrint('Auth error while creating admin: ${e.message}');
+      debugPrint('❌ Auth error while creating admin: ${e.message}');
       return {'success': false, 'error': e.message};
     } catch (e) {
-      // General Firebase errors
-      debugPrint('Firebase error while creating admin: $e');
+      debugPrint('❌ Firebase error while creating admin: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
-  
+
+
   // Display all Admins
   Future<List<Map<String, dynamic>>> getAdmins() async {
     try {
@@ -997,13 +1024,22 @@ class DatabaseService {
     }
   }
 
-  // Function to delete an admin
+  // Delete own admin account (self-deletion only)
   Future<void> deleteAdmin(String adminId) async {
-    try {
-      await _db.child('admins').child(adminId).remove();
-      debugPrint('Admin with ID $adminId deleted successfully');
-    } catch (e) {
-      debugPrint('Firebase error deleting admin: $e');
+    final url = Uri.parse('$baseUrl/delete-admin');
+    final headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': ADMIN_API_KEY,
+    };
+    final body = jsonEncode({'adminId': adminId});
+
+    final response = await http.post(url, headers: headers, body: body);
+
+    if (response.statusCode == 200) {
+      debugPrint('✅ Admin deleted successfully from Cloud Function.');
+    } else {
+      debugPrint('❌ Failed to delete admin: ${response.body}');
+      throw Exception('Failed to delete admin.');
     }
   }
 

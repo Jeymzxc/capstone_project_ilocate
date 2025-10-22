@@ -213,7 +213,7 @@ class _z_settingsAddState extends State<z_settingsAdd> {
       final newAdminData = {
         'fullname': _adminForm.fullnameController.text,
         'username': _adminForm.usernameController.text,
-        'email': _adminForm.emailController.text,
+        'email': _adminForm.emailController.text.trim().toLowerCase(),
         'phone': _adminForm.phoneController.text,
         'password': _adminForm.passwordController.text,
         'sex': _adminForm.selectedSex!,
@@ -514,10 +514,14 @@ class _z_settingsAddState extends State<z_settingsAdd> {
               return null;
             },
             decoration: InputDecoration(
-              errorStyle: const TextStyle(color: Colors.red),
+              errorStyle: const TextStyle(
+                color: Colors.red,
+                fontSize: 12.0,       
+                height: 1.2,          
+              ),
               counterText: '',
               helperText: type == 'password'
-                  ? 'Password must be at least 8 characters long.\nInclude uppercase, lowercase, number, and a special character. \nExample: Password#123'
+                  ? 'Password must be at least 8 characters long.\nInclude uppercase, lowercase, number, and a \nspecial character. \nExample: Password#123'
                   : null,
               helperStyle: const TextStyle(
                 fontSize: 12.0,
@@ -583,7 +587,11 @@ class _z_settingsAddState extends State<z_settingsAdd> {
                   return null;
                 },
                 decoration: InputDecoration(
-                  errorStyle: const TextStyle(color: Colors.red),
+                  errorStyle: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 12.0,       
+                    height: 1.2,          
+                  ),
                   hintText: date == null ? '' : DateFormat('yyyy-MM-dd').format(date),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12.0),
@@ -708,7 +716,11 @@ class _z_settingsAddState extends State<z_settingsAdd> {
               return null;
             },
             decoration: InputDecoration(
-              errorStyle: const TextStyle(color: Colors.red),
+              errorStyle: const TextStyle(
+                color: Colors.red,
+                fontSize: 12.0,       
+                height: 1.2,          
+              ),
               counterText: '',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
