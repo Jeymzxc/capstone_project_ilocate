@@ -21,6 +21,7 @@ class _AlertsState extends State<Alerts> {
 
   String? _rescuerTeamName;
   bool _isLoading = true;
+  Stream<List<Map<String, dynamic>>>? _rescuerAlertsStream;
 
   @override
   void initState() {
@@ -37,6 +38,7 @@ class _AlertsState extends State<Alerts> {
       if (mounted && teamData != null) {
         setState(() {
           _rescuerTeamName = teamData['teamName'];
+          _rescuerAlertsStream = _db.streamRescuerIncidents(_rescuerTeamName!);
           _isLoading = false;
         });
       } else {
@@ -135,15 +137,21 @@ class _AlertsState extends State<Alerts> {
                           child: Text('No team assigned.',
                               style: TextStyle(fontSize: 18.0)))
                       : StreamBuilder<List<Map<String, dynamic>>>(
-                          stream: _db.streamRescuerIncidents(_rescuerTeamName!),
+                          stream: _rescuerAlertsStream,
                           builder: (context, snapshot) {
                             if (snapshot.hasError) {
                               return const Center(
                                   child: Text('Failed to load alerts.'));
                             }
 
-                            final List<Map<String, dynamic>> alertsData =
-                                snapshot.data ?? [];
+                            List<Map<String, dynamic>> alertsData = snapshot.data ?? [];
+
+                            // Sort by heart rate (lowest first = most urgent)
+                            alertsData.sort((a, b) {
+                              final aHR = double.tryParse(a['value']?['heartRate']?.toString() ?? '') ?? 9999;
+                              final bHR = double.tryParse(b['value']?['heartRate']?.toString() ?? '') ?? 9999;
+                              return aHR.compareTo(bHR);
+                            });
 
                             if (alertsData.isEmpty) {
                               return const Center(
@@ -215,14 +223,52 @@ class _AlertsState extends State<Alerts> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'DETAILS:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16.0,
-                  color: ilocateRed,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'DETAILS:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16.0,
+                      color: ilocateRed,
+                    ),
+                  ),
+                  if ((double.tryParse(heartRate) ?? 0) <= 60)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withOpacity(0.4),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'VERY URGENT',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
+              const SizedBox(height: 8.0),
+
               const SizedBox(height: 8.0),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

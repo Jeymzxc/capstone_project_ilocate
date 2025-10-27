@@ -116,15 +116,52 @@ class _wAlertsState extends State<wAlerts> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'ALERT DETAILS:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16.0,
-                  color: ilocateRed,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    'ALERT DETAILS:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16.0,
+                      color: ilocateRed,
+                    ),
+                  ),
+                  if ((double.tryParse(heartRate) ?? 0) <= 60)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withValues(alpha: 0.4),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'VERY URGENT',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 8.0),
+
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -455,7 +492,14 @@ class _wAlertsState extends State<wAlerts> {
                 return const Center(child: CircularProgressIndicator(color: ilocateRed,));
               }
 
-              final incidents = snapshot.data ?? [];
+              List<Map<String, dynamic>> incidents = snapshot.data ?? [];
+
+              // Sort incidents by heart rate ascending (lowest = most urgent)
+              incidents.sort((a, b) {
+                final aHR = double.tryParse(a['value']?['heartRate']?.toString() ?? '') ?? 9999;
+                final bHR = double.tryParse(b['value']?['heartRate']?.toString() ?? '') ?? 9999;
+                return aHR.compareTo(bHR);
+              });
 
               if (incidents.isEmpty) {
                 return const Center(child: Text('No active SOS alerts.'));
