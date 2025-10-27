@@ -6,6 +6,7 @@ import 'f_change_password.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database/firebase_db.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class Settings extends StatefulWidget {
   final VoidCallback onNavigateToTeam;
@@ -126,13 +127,19 @@ class _SettingsState extends State<Settings> {
         final teamData = await _dbService.getSingleTeam(teamId);
         final teamName = teamData?['teamName'];
 
-        if (teamName != null) {
+        if (teamName != null && teamName.isNotEmpty) {
+          // Mark rescuer as inactive in Firebase
+          await _dbService.updateRescuerStatus(teamName, false);
+          debugPrint("🔴 Rescuer $teamName marked inactive");
+
+          // Unsubscribe from their FCM topic
           await FirebaseMessaging.instance.unsubscribeFromTopic("rescuer_$teamName");
           debugPrint("🚫 Rescuer unsubscribed from rescuer_$teamName");
         }
       }
 
       // Clear stored session data
+      await FirebaseAuth.instance.signOut();
       await prefs.clear();
     } catch (e) {
       debugPrint("Logout error: $e");
@@ -141,8 +148,9 @@ class _SettingsState extends State<Settings> {
     if (!context.mounted) return;
 
     Navigator.of(context).pop(); 
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const UserLogin()),
+      (route) => false, 
     );
   }
 

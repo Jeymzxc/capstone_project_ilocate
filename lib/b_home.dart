@@ -31,20 +31,26 @@ class _HomeState extends State<Home> {
   // For Streaming current incidents
   StreamSubscription<List<Map<String, dynamic>>>? _alertSubscription;
 
+  StreamSubscription<dynamic>? _mapIncidentSubscription;
+
+
 
   @override
   void initState() {
     super.initState();
-    _initializeLocation(); 
-    _loadTeamIdAndStreamIncidents();
+    _loadTeamIdAndStreamIncidents().then((_) {
+      _initializeLocation(); 
+    });
   }
 
-  @override
+   @override
   void dispose() {
     _positionStreamSubscription?.cancel(); 
     _alertSubscription?.cancel();
+    _mapIncidentSubscription?.cancel();
     super.dispose();
   }
+
    
 
   Future<void> _loadTeamIdAndStreamIncidents() async {
@@ -74,7 +80,8 @@ class _HomeState extends State<Home> {
     }
 
     if (teamId != null) {
-      _databaseService.streamRescuerMapIncidents(_rescuerTeamName!).listen((incidents) async {
+      _mapIncidentSubscription = 
+        _databaseService.streamRescuerMapIncidents(_rescuerTeamName!).listen((incidents) async {
         final updatedMarkers = <Marker>{};
 
         for (var incident in incidents) {
@@ -111,7 +118,7 @@ class _HomeState extends State<Home> {
             Marker(
               markerId: const MarkerId("rescuer"),
               position: _rescuerLocation!,
-              infoWindow: const InfoWindow(title: "Your Location"),
+              infoWindow: const InfoWindow(title: "Rescuer's Location"),
               icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
             ),
           );
@@ -148,6 +155,15 @@ class _HomeState extends State<Home> {
         ),
       );
 
+      if (_rescuerTeamName != null) {
+        await _databaseService.updateRescuerLocation(
+          _rescuerTeamName,
+          initialPosition.latitude,
+          initialPosition.longitude,
+        );
+        debugPrint("📍 Initial location uploaded for $_rescuerTeamName");
+      }
+
       final initialLatLng = LatLng(initialPosition.latitude, initialPosition.longitude);
 
       if (mounted) {
@@ -178,8 +194,24 @@ class _HomeState extends State<Home> {
 
     _positionStreamSubscription =
         Geolocator.getPositionStream(locationSettings: locationSettings)
-            .listen((Position position) {
+            .listen((Position position) async {
       final newLocation = LatLng(position.latitude, position.longitude);
+
+
+      if (_rescuerTeamName != null) {
+        debugPrint("📡 Sending location update for $_rescuerTeamName: "
+        "Lat=${position.latitude}, Lng=${position.longitude}");
+
+        await _databaseService.updateRescuerLocation(
+          _rescuerTeamName,
+          position.latitude,
+          position.longitude,
+        );
+
+        debugPrint("✅ Successfully updated location to Firebase for $_rescuerTeamName");
+      } else {
+        debugPrint("⚠️ Skipped update: teamId is null");
+      }
       
       // Only update if the location has changed significantly to reduce widget rebuilds
       if (_rescuerLocation == null || 
@@ -196,7 +228,7 @@ class _HomeState extends State<Home> {
               Marker(
                 markerId: const MarkerId("rescuer"),
                 position: _rescuerLocation!,
-                infoWindow: const InfoWindow(title: "Your Location"),
+                infoWindow: const InfoWindow(title: "Rescuer's Location"),
                 icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
               ),
             );

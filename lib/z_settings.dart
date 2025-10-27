@@ -7,6 +7,7 @@ import 'z_manage_users.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database/firebase_db.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class z_Settings extends StatefulWidget {
   const z_Settings({super.key});
@@ -121,7 +122,8 @@ class _z_SettingsState extends State<z_Settings> {
       debugPrint("🚫 Admin unsubscribed from distressAlerts");
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('adminsId');
+      await prefs.clear();
+      await FirebaseAuth.instance.signOut();
     } catch (e) {
       debugPrint("Logout error: $e");
     }
@@ -129,8 +131,9 @@ class _z_SettingsState extends State<z_Settings> {
     if (!context.mounted) return;
 
     Navigator.of(context).pop();
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const UserLogin()),
+      (route) => false,
     );
   }
 

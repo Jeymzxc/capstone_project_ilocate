@@ -395,6 +395,21 @@ class _x_TeamState extends State<x_Team> {
 
                       final teams = snapshot.data ?? [];
 
+                      // Sort teams Alphabetically and Numerically
+                      teams.sort((a, b) {
+                        final nameA = a['teamName']?.toString().toLowerCase() ?? '';
+                        final nameB = b['teamName']?.toString().toLowerCase() ?? '';
+                        
+                        // First sort alphabetically by the text part
+                        final textCompare = nameA.compareTo(nameB);
+                        if (textCompare != 0) return textCompare;
+                        
+                        // Then by number if text is the same
+                        final numA = int.tryParse(nameA.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                        final numB = int.tryParse(nameB.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                        return numA.compareTo(numB);
+                      });
+
                       return ListView.builder(
                         itemCount: teams.length + 1,
                         itemBuilder: (context, index) {

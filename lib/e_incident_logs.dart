@@ -20,6 +20,7 @@ class _LogsState extends State<Logs> {
   final DatabaseService _db = DatabaseService();
   String? _rescuerTeamName;
   bool _isLoading = true;
+  Stream<List<Map<String, dynamic>>>? _rescuerLogsStream;
 
   @override
   void initState() {
@@ -36,6 +37,7 @@ class _LogsState extends State<Logs> {
       if (mounted && teamData != null) {
         setState(() {
           _rescuerTeamName = teamData['teamName'];
+          _rescuerLogsStream = _db.streamRescuerLogs(_rescuerTeamName!);
           _isLoading = false;
         });
       } else {
@@ -339,7 +341,7 @@ class _LogsState extends State<Logs> {
                           // Logs list
                           Expanded(
                             child: StreamBuilder<List<Map<String, dynamic>>>(
-                              stream: _db.streamRescuerLogs(_rescuerTeamName!),
+                              stream: _rescuerLogsStream,
                               builder: (context, snapshot) {
                                 if (snapshot.hasError) return const Center(child: Text('Failed to load logs.'));
                                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFC70000)));

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'models/alert.dart';
 import 'database/firebase_db.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:intl/intl.dart';
 
 class AlertsView extends StatefulWidget {
   final Alert alert;
@@ -32,11 +34,16 @@ class _AlertsViewState extends State<AlertsView> {
   String? _dateOfBirth;
   String? _sex;
 
+  GoogleMapController? _mapController;
+  final Set<Marker> _markers = {};
+  StreamSubscription<Map<String, dynamic>>? _rescuerLocationSub;
+
   @override
   void initState() {
     super.initState();
     _currentAlert = widget.alert;
     _fetchUserDetails(); // Load personal details from database
+    _listenToRescuerLocations();
   }
 
   /// Fetches user details from the database using deviceId
@@ -58,6 +65,81 @@ class _AlertsViewState extends State<AlertsView> {
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  // Listen for rescuer locations from Firebase
+  void _listenToRescuerLocations() {
+    _rescuerLocationSub = _db.streamRescuerLocations().listen((locations) {
+      if (!mounted) return;
+
+      final rescuerMarkers = <Marker>{};
+      locations.forEach((teamName, value) {
+        final lat = value['latitude']?.toDouble();
+        final lng = value['longitude']?.toDouble();
+        final status = value['status'];
+        final lastStatusChange = value['lastStatusChange'];
+
+        if (lat == null || lng == null) return;
+
+        final bool isActive = status == 'active';
+        final markerColor =
+            isActive ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueYellow;
+
+        String snippet;
+        if (isActive) {
+          snippet = '🟢 Active';
+        } else {
+          String lastActive = '';
+          if (lastStatusChange != null) {
+            final t =
+                DateTime.fromMillisecondsSinceEpoch(lastStatusChange);
+            final formatted =
+                DateFormat('MMM d, yyyy h:mm a').format(t);
+            lastActive = ' | Last Active: $formatted';
+          }
+          snippet = '🔴 Inactive$lastActive';
+        }
+
+        rescuerMarkers.add(
+          Marker(
+            markerId: MarkerId('rescuer_$teamName'),
+            position: LatLng(lat, lng),
+            infoWindow: InfoWindow(
+              title: 'Team $teamName',
+              snippet: snippet,
+            ),
+            icon:
+                BitmapDescriptor.defaultMarkerWithHue(markerColor),
+          ),
+        );
+      });
+
+      // Always include the victim marker
+      final victimMarker = Marker(
+        markerId: const MarkerId("victim"),
+        position: LatLng(_currentAlert.latitude, _currentAlert.longitude),
+        infoWindow: InfoWindow(
+          title: _fullName ?? _currentAlert.rescueeName,
+          snippet: "Victim's Location",
+        ),
+        icon:
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+      );
+
+      setState(() {
+        _markers
+          ..clear()
+          ..add(victimMarker)
+          ..addAll(rescuerMarkers);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _rescuerLocationSub?.cancel(); 
+    _mapController?.dispose();
+    super.dispose();
   }
 
   /// Calculates age from date of birth string (yyyy-MM-dd)
@@ -140,22 +222,15 @@ class _AlertsViewState extends State<AlertsView> {
                   child: GoogleMap(
                     mapType: MapType.normal,
                     initialCameraPosition: CameraPosition(
-                       target: LatLng(_currentAlert.latitude, _currentAlert.longitude),
+                      target: LatLng(_currentAlert.latitude,
+                          _currentAlert.longitude),
                       zoom: 12,
                     ),
-                    markers: {
-                      Marker(
-                        markerId: const MarkerId("victim"),
-                        position: LatLng(_currentAlert.latitude, _currentAlert.longitude),
-                        infoWindow: InfoWindow(
-                          title: _fullName ?? _currentAlert.rescueeName,
-                          snippet: "Victim's Location",
-                        ),
-                        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-                      ),
+                    onMapCreated: (controller) {
+                      _mapController = controller;
                     },
-                    myLocationEnabled: false, 
-                    myLocationButtonEnabled: false,
+                    markers: _markers,
+                    myLocationEnabled: false,
                     zoomControlsEnabled: false,
                   ),
                 ),

@@ -458,6 +458,43 @@ class DatabaseService {
       });
   }
 
+  // Rescuer's Location
+  Future<void> updateRescuerLocation(String? teamName, double lat, double lng) async {
+    if (teamName == null || teamName.isEmpty) return;
+
+    final ref = _db.child('rescuerLocations/$teamName');
+    await ref.update({
+      'latitude': lat,
+      'longitude': lng,
+      'timestamp': ServerValue.timestamp,
+    });
+    debugPrint("📍 Updated location for $teamName: ($lat, $lng)");
+  }
+
+  // Update rescuer's status (Active/Inactive)
+  Future<void> updateRescuerStatus(String teamName, bool isActive) async {
+    final ref = _db.child('rescuerLocations/$teamName');
+    await ref.update({
+      'status': isActive ? 'active' : 'inactive',
+      'lastStatusChange': ServerValue.timestamp, 
+    });
+
+    debugPrint("🔄 Rescuer $teamName is now ${isActive ? '🟢 active' : '🔴 inactive'}");
+  }
+
+
+
+  // For displaying rescuer location in Admin dashboard
+  Stream<Map<String, dynamic>> streamRescuerLocations() {
+    final ref = _db.child('rescuerLocations');
+    return ref.onValue.map((event) {
+      final data = event.snapshot.value;
+      if (data == null) return {};
+      return Map<String, dynamic>.from(data as Map);
+    });
+  }
+
+
 
 
   // ---- LOGS INCIDENT FOR ADMIN ---
@@ -517,6 +554,12 @@ class DatabaseService {
       'archived': null, // Firebase removes the key if you set it to null
     });
   }
+
+  // Function to permanently delete an archived incident
+  Future<void> deleteArchivedIncident(String incidentId) async {
+    await _db.child('incidents/$incidentId').remove();
+  }
+
 
 
 
@@ -728,19 +771,33 @@ class DatabaseService {
         return {'success': false, 'duplicates': duplicates};
       }
 
-      // Create Firebase Auth account for the team
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final FirebaseApp tempApp = await Firebase.initializeApp(
+        name: 'tempTeamApp',
+        options: Firebase.app().options,
+      );
+
+      final FirebaseAuth tempAuth = FirebaseAuth.instanceFor(app: tempApp);
+
+      // Create new admin account (does not affect current user session)
+      final userCredential = await tempAuth.createUserWithEmailAndPassword(
         email: teamData['email'],
         password: teamData['password'],
       );
 
       final uid = userCredential.user!.uid;
 
-      // Remove plain password before saving to database
+      // Remove Password before saving to the database
       teamData.remove('password');
 
       // Save team info in Realtime Database using the UID as key
-      await _db.child('teams').child(uid).set(teamData);
+      await _db.child('teams').child(uid).set({
+        'id': uid,
+        ...teamData,
+      });
+
+
+      await tempAuth.signOut();
+      await tempApp.delete();
 
       debugPrint('Team account created successfully');
       return {'success': true, 'uid': uid};

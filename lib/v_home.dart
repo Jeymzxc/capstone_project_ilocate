@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -23,84 +24,137 @@ class _AdminHomePageState extends State<AdminHomePage> {
   final Set<Marker> _markers = {};
 
   StreamSubscription<List<Map<String, dynamic>>>? _pendingSubscription;
+  StreamSubscription<Map<String, dynamic>>? _rescuerLocationSub;
+  
 
   @override
-  void initState() {
-    super.initState();
-    _subscribeToAlerts();
-
-    // Listen to Pending Incidents Only
-    _pendingSubscription = _databaseService.streamPendingIncidents().listen((incidents) async {
-      if (!mounted) return;
-
-      // Update SOS counter (number of pending incidents)
-      setState(() {
-        _sosNotificationCount = incidents.length;
-      });
-
-      // Prepare new marker set
-      final updatedMarkers = <Marker>{};
-
-      for (var incident in incidents) {
-        final devuid = incident["deviceId"];
-        final lat = incident["value"]["latitude"];
-        final lng = incident["value"]["longitude"];
-        final hr = incident["value"]["heartRate"];
-
-        // Fetch wearer info by device UID
-        final deviceInfo = await _databaseService.getDeviceInfoByDevuid(devuid);
-        final fullname = deviceInfo?["fullname"] ?? "Unknown";
-        final phone = deviceInfo?["phone"] ?? "N/A";
-
-        // Create map marker
-        updatedMarkers.add(
-          Marker(
-            markerId: MarkerId(devuid),
-            position: LatLng(lat, lng),
-            infoWindow: InfoWindow(
-              title: fullname,
-              snippet: "Heart Rate: $hr | Phone: $phone",
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueRed,
-            ),
-            onTap: () {
-              if (_mapController != null) {
-                _lastMarkerPosition = LatLng(lat, lng);
-                _mapController!.animateCamera(
-                  CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16),
-                );
-              }
-            },
-          ),
-        );
-      }
-
-      // Update markers on the map
-      setState(() {
-        _markers
-          ..clear()
-          ..addAll(updatedMarkers);
-      });
-    });
-  }
-
-  // Subscribe to Firebase Cloud Messaging topic for new distress alerts
-  Future<void> _subscribeToAlerts() async {
-    try {
-      await FirebaseMessaging.instance.subscribeToTopic("distressAlerts");
-      debugPrint("📡 Admin subscribed to distressAlerts topic");
-    } catch (e) {
-      debugPrint("❌ FCM subscription failed: $e");
+    void initState() {
+      super.initState();
+      _subscribeToAlerts();
+      _listenToPendingIncidents();
+      _listenToRescuerLocations(); 
     }
-  }
 
-  @override
-  void dispose() {
-    _pendingSubscription?.cancel();
-    _mapController = null;
-    super.dispose();
-  }
+    // Listen to pending distress incidents
+    void _listenToPendingIncidents() {
+      _pendingSubscription = _databaseService.streamPendingIncidents().listen((incidents) async {
+        if (!mounted) return;
+
+        setState(() {
+          _sosNotificationCount = incidents.length;
+        });
+
+        final incidentMarkers = <Marker>{};
+
+        for (var incident in incidents) {
+          final devuid = incident["deviceId"];
+          final lat = incident["value"]["latitude"];
+          final lng = incident["value"]["longitude"];
+          final hr = incident["value"]["heartRate"];
+
+          final deviceInfo = await _databaseService.getDeviceInfoByDevuid(devuid);
+          final fullname = deviceInfo?["fullname"] ?? "Unknown";
+          final phone = deviceInfo?["phone"] ?? "N/A";
+
+          incidentMarkers.add(
+            Marker(
+              markerId: MarkerId('incident_$devuid'),
+              position: LatLng(lat, lng),
+              infoWindow: InfoWindow(
+                title: fullname,
+                snippet: "Heart Rate: $hr | Phone: $phone",
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+              onTap: () {
+                if (_mapController != null) {
+                  _lastMarkerPosition = LatLng(lat, lng);
+                  _mapController!.animateCamera(
+                    CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16),
+                  );
+                }
+              },
+            ),
+          );
+        }
+
+        // Merge with rescuer markers (if any)
+        setState(() {
+          _markers.removeWhere((m) => m.markerId.value.startsWith('incident_'));
+          _markers.addAll(incidentMarkers);
+        });
+      });
+    }
+
+    // Listen to rescuer locations
+    void _listenToRescuerLocations() {
+      _rescuerLocationSub = _databaseService.streamRescuerLocations().listen((locations) {
+        if (!mounted) return;
+
+        final rescuerMarkers = <Marker>{};
+
+        locations.forEach((teamName, value) {
+          final lat = value['latitude']?.toDouble();
+          final lng = value['longitude']?.toDouble();
+          final status = value['status'];
+          final lastStatusChange = value['lastStatusChange'];
+
+          if (lat == null || lng == null) return;
+
+          final bool isActive = status == 'active';
+          final markerColor = isActive ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueYellow;
+
+          // Show "Last Active" only if inactive
+          String snippet;
+          if (isActive) {
+            snippet = '🟢 Active';
+          } else {
+            String lastActive = '';
+            if (lastStatusChange != null) {
+              final t = DateTime.fromMillisecondsSinceEpoch(lastStatusChange);
+              final formattedDate = DateFormat('MMMM d, yyyy h:mm a').format(t);
+              lastActive = ' | Last Active: $formattedDate';
+            }
+            snippet = '🔴 Inactive$lastActive';
+          }
+
+          rescuerMarkers.add(
+            Marker(
+              markerId: MarkerId('rescuer_$teamName'),
+              position: LatLng(lat, lng),
+              infoWindow: InfoWindow(
+                title: 'Team $teamName',
+                snippet: snippet,
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(markerColor),
+            ),
+          );
+        });
+
+        setState(() {
+          _markers.removeWhere((m) => m.markerId.value.startsWith('rescuer_'));
+          _markers.addAll(rescuerMarkers);
+        });
+      });
+    }
+
+
+    // Subscribe to FCM distress alerts
+    Future<void> _subscribeToAlerts() async {
+      try {
+        await FirebaseMessaging.instance.subscribeToTopic("distressAlerts");
+        debugPrint("📡 Admin subscribed to distressAlerts topic");
+      } catch (e) {
+        debugPrint("❌ FCM subscription failed: $e");
+      }
+    }
+
+    @override
+    void dispose() {
+      _pendingSubscription?.cancel();
+      _rescuerLocationSub?.cancel();
+      _mapController = null;
+      super.dispose();
+    }
 
   @override
   Widget build(BuildContext context) {

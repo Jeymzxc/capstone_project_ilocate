@@ -28,6 +28,7 @@ class _y_LogsState extends State<y_Logs> with AutomaticKeepAliveClientMixin {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -69,17 +70,22 @@ class _y_LogsState extends State<y_Logs> with AutomaticKeepAliveClientMixin {
               child: Column(
                 children: [
                   TextField(
+                    cursorColor: Colors.black87,
                     controller: _searchController,
                     onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
                       hintText: 'SEARCH INCIDENT ID',
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.0),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFC70000), width: 2),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16.0),
+                  const SizedBox(height: 12),
                   Expanded(
                     child: TabBarView(
                       children: [
@@ -127,9 +133,16 @@ class _ActiveTabState extends State<ActiveTab>
     with AutomaticKeepAliveClientMixin {
   String _statusFilter = 'ALL';
   final Set<String> _expandedLogs = {};
+  late final Stream<List<Map<String, dynamic>>> _activeIncidentsStream;
 
   @override
   bool get wantKeepAlive => true;
+  
+  @override
+  void initState() {
+    super.initState();
+    _activeIncidentsStream = widget.dbService.streamAllActiveIncidents();
+  }
 
   void _toggleExpansion(String incidentId) {
     setState(() {
@@ -141,10 +154,202 @@ class _ActiveTabState extends State<ActiveTab>
     });
   }
 
-  void _archiveLog(Map<String, dynamic> logToArchive) async {
+  void _showCustomDialog({
+    required String title,
+    required String message,
+    required Color headerColor,
+    required IconData icon,
+  }) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: headerColor),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(icon, color: headerColor, size: 32),
+                            const SizedBox(width: 8),
+                            Text(
+                              title.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: headerColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8),
+                        Text(message, style: const TextStyle(fontSize: 14)),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: headerColor,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30)),
+                              ),
+                              child: const Text('OK',
+                                  style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showArchiveConfirmationDialog(Map<String, dynamic> log) {
+    final incidentId = log['id'] ?? 'N/A';
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: const Color(0xFFC70000)), // red header
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.archive_rounded, color: Color(0xFFC70000), size: 32),
+                            SizedBox(width: 8),
+                            Text(
+                              'CONFIRM ACTION',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFC70000),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Are you sure you want to archive Incident $incidentId?',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: const [
+                            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'This action cannot be undone.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFFC70000)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: const Text(
+                                'NO',
+                                style: TextStyle(color: Color(0xFFC70000)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                _archiveLog(log);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFC70000),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: const Text(
+                                'YES',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _archiveLog(Map<String, dynamic> logToArchive) async {
     final incidentId = logToArchive['id']!;
     if ((logToArchive['status'] as String).toLowerCase() == 'resolved') {
-      await widget.dbService.archiveIncident(incidentId);
+      try {
+        await widget.dbService.archiveIncident(incidentId);
+        _showCustomDialog(
+          title: 'Success',
+          message: 'Incident has been archived successfully.',
+          headerColor: Colors.green,
+          icon: Icons.check_circle_outline,
+        );
+      } catch (e) {
+        _showCustomDialog(
+          title: 'Error',
+          message: 'Failed to archive. Please try again.',
+          headerColor: Colors.red,
+          icon: Icons.error_outline,
+        );
+      }
     }
   }
 
@@ -178,17 +383,20 @@ class _ActiveTabState extends State<ActiveTab>
           ],
           onChanged: (val) => setState(() => _statusFilter = val!),
           decoration: InputDecoration(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8.0),
+              borderRadius: BorderRadius.circular(8.0), 
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFC70000), width: 2),
             ),
           ),
         ),
         const SizedBox(height: 16.0),
         Expanded(
           child: StreamBuilder<List<Map<String, dynamic>>>(
-            stream: widget.dbService.streamAllActiveIncidents(),
+            stream: _activeIncidentsStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
@@ -227,7 +435,7 @@ class _ActiveTabState extends State<ActiveTab>
             log: log,
             isExpanded: isExpanded,
             onToggle: () => _toggleExpansion(log['id']),
-            onArchive: () => _archiveLog(log),
+            onArchive: () => _showArchiveConfirmationDialog(log),
             isArchivedView: false,
             getDeviceInfo: widget.getDeviceInfo,
           ),
@@ -257,9 +465,15 @@ class ArchivedTab extends StatefulWidget {
 class _ArchivedTabState extends State<ArchivedTab>
     with AutomaticKeepAliveClientMixin {
   final Set<String> _expandedLogs = {};
+  late final Stream<List<Map<String, dynamic>>> _archivedIncidentsStream;
 
   @override
   bool get wantKeepAlive => true;
+  @override
+  void initState() {
+    super.initState();
+    _archivedIncidentsStream = widget.dbService.streamAllArchivedIncidents();
+  }
 
   void _toggleExpansion(String incidentId) {
     setState(() {
@@ -270,10 +484,196 @@ class _ArchivedTabState extends State<ArchivedTab>
       }
     });
   }
+  void _showCustomDialog({
+    required String title,
+    required String message,
+    required Color headerColor,
+    required IconData icon,
+  }) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: headerColor),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(icon, color: headerColor, size: 32),
+                            const SizedBox(width: 8),
+                            Text(
+                              title.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: headerColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8),
+                        Text(message, style: const TextStyle(fontSize: 14)),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: headerColor,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30)),
+                              ),
+                              child: const Text('OK',
+                                  style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showUnarchiveConfirmationDialog(Map<String, dynamic> log) {
+    final incidentId = log['id'] ?? 'N/A';
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(height: 4, color: Colors.green),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.unarchive_rounded,
+                                color: Colors.green, size: 32),
+                            SizedBox(width: 8),
+                            Text(
+                              'CONFIRM ACTION',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Are you sure you want to restore Incident $incidentId to Active?',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'This will make the incident visible again in Active Logs.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.green),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: const Text(
+                                'NO',
+                                style: TextStyle(color: Colors.green),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                _unarchiveLog(log);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: const Text(
+                                'YES',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   void _unarchiveLog(Map<String, dynamic> log) async {
     final incidentId = log['id']!;
-    await widget.dbService.unarchiveIncident(incidentId);
+    try {
+      await widget.dbService.unarchiveIncident(incidentId);
+      _showCustomDialog(
+        title: 'Success',
+        message: 'Incident has been restored to Active.',
+        headerColor: Colors.green,
+        icon: Icons.check_circle_outline,
+      );
+    } catch (e) {
+      _showCustomDialog(
+        title: 'Error',
+        message: 'Failed to unarchive. Please try again.',
+        headerColor: Colors.red,
+        icon: Icons.error_outline,
+      );
+    }
   }
 
   List<Map<String, dynamic>> _filterLogs(List<Map<String, dynamic>> logs) {
@@ -289,7 +689,7 @@ class _ArchivedTabState extends State<ArchivedTab>
   Widget build(BuildContext context) {
     super.build(context);
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: widget.dbService.streamAllArchivedIncidents(),
+      stream:  _archivedIncidentsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -318,7 +718,7 @@ class _ArchivedTabState extends State<ArchivedTab>
                 log: log,
                 isExpanded: isExpanded,
                 onToggle: () => _toggleExpansion(log['id']),
-                onArchive: () => _unarchiveLog(log),
+                onArchive: () => _showUnarchiveConfirmationDialog(log),
                 isArchivedView: true,
                 getDeviceInfo: widget.getDeviceInfo,
               ),

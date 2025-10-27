@@ -193,7 +193,7 @@ class _AlertsViewState extends State<AlertsView> {
     }
 
     try {
-      final polyline.PolylinePoints polylinePoints = polyline.PolylinePoints(apiKey: GOOGLE_MAPS_API_KEY);
+      final polyline.PolylinePoints polylinePoints = polyline.PolylinePoints(apiKey: ROUTES_API_KEY);
 
       polyline.RoutesApiRequest request = polyline.RoutesApiRequest(
         origin: polyline.PointLatLng(_rescuerLocation!.latitude, _rescuerLocation!.longitude,),

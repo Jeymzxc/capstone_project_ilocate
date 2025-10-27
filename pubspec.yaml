@@ -1,7 +1,7 @@
 name: ilocate
-description: "A new Flutter project."
+description: "iLocate - Mobile Application for Disaster Response"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.8.1

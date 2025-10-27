@@ -158,6 +158,10 @@ class _UserLoginState extends State<UserLogin> {
       final teamResult = await DatabaseService().loginUser('teams', email, password);
 
       if (teamResult['success']) {
+        final teamName = teamResult['teamName'];
+        if (teamName != null && teamName.isNotEmpty) {
+          await DatabaseService().updateRescuerStatus(teamName, true);
+        }
         await _showAlertDialog(
           'Login Successful',
           'Welcome, ${teamResult['teamName']}! You are logged in as a rescuer.',

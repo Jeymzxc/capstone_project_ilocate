@@ -47,6 +47,21 @@ class _wAlertsAssignState extends State<wAlertsAssign> {
   Future<void> _fetchTeams() async {
   try {
     final teamNames = await _db.getTeamNames();
+
+    teamNames.sort((a, b) {
+      final nameA = a.toLowerCase();
+      final nameB = b.toLowerCase();
+
+      // Compare alphabetic text first
+      final textCompare = nameA.compareTo(nameB);
+      if (textCompare != 0) return textCompare;
+
+      // Extract any numeric suffix for secondary sorting
+      final numA = int.tryParse(a.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      final numB = int.tryParse(b.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      return numA.compareTo(numB);
+    });
+
     setState(() {
       _groupOptions = teamNames;
     });
