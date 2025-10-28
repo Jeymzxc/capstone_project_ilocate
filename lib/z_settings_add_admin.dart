@@ -10,7 +10,7 @@ class AdminFormData {
   final TextEditingController emailController;
   final TextEditingController phoneController;
   final TextEditingController passwordController;
-  final TextEditingController acdvIdController;
+  // final TextEditingController acdvIdController;
   final TextEditingController addressController;
   String? selectedSex;
   DateTime? selectedDate;
@@ -22,7 +22,7 @@ class AdminFormData {
         emailController = TextEditingController(),
         phoneController = TextEditingController(),
         passwordController = TextEditingController(),
-        acdvIdController = TextEditingController(),
+        // acdvIdController = TextEditingController(),
         addressController = TextEditingController(),
         formKey = GlobalKey<FormState>();
 
@@ -32,7 +32,7 @@ class AdminFormData {
     emailController.dispose();
     phoneController.dispose();
     passwordController.dispose();
-    acdvIdController.dispose();
+    // acdvIdController.dispose();
     addressController.dispose();
   }
 }
@@ -217,7 +217,7 @@ class _z_settingsAddState extends State<z_settingsAdd> {
         'phone': _adminForm.phoneController.text,
         'password': _adminForm.passwordController.text,
         'sex': _adminForm.selectedSex!,
-        'acdvId': _adminForm.acdvIdController.text,
+        // 'acdvId': _adminForm.acdvIdController.text,
         'dateOfBirth': DateFormat('yyyy-MM-dd').format(_adminForm.selectedDate!),
         'address': _adminForm.addressController.text,
       };
@@ -259,9 +259,9 @@ class _z_settingsAddState extends State<z_settingsAdd> {
           if (duplicates['phone'] == true) {
             message += '- Phone number already exists.\n';
           }
-          if (duplicates['acdvId'] == true) {
+          /* if (duplicates['acdvId'] == true) {
             message += '- ACDVID already exists.\n';
-          }
+          } */
         }
         
         if (message == 'Failed to register admin. The following issues were found:\n') {
@@ -409,7 +409,7 @@ class _z_settingsAddState extends State<z_settingsAdd> {
                 _buildTextField('Phone No.', formData.phoneController, type: 'phone'),
                 _buildTextField('Password', formData.passwordController, obscureText: true, type: 'password'),
                 _buildRadioButtons(formData),
-                _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController, type: 'acdvId'),
+                // _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController, type: 'acdvId'),
                 _buildDatePickerField('Date of Birth', formData.selectedDate, formData),
                 _buildAddressField('Address', formData.addressController),
               ],
@@ -455,8 +455,8 @@ class _z_settingsAddState extends State<z_settingsAdd> {
                   return 15; 
                 case 'email':
                   return 100;
-                case 'acdvId':
-                  return 16;
+                /* case 'acdvId':
+                  return 16; */
                 default:
                   return null; 
               }

@@ -97,12 +97,12 @@ class z_adminDetails extends StatelessWidget {
                 Icons.transgender,
                 ilocateRed,
               ),
-              _buildDetailCard(
+              /*_buildDetailCard(
                 'ACDV ID',
                 admin['acdvId'] ?? 'N/A',
                 Icons.badge,
                 ilocateRed,
-              ),
+              ),*/
             ],
           ),
         ),

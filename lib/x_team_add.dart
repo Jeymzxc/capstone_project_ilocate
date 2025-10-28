@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 class MemberFormData {
   final TextEditingController fullnameController;
   final TextEditingController addressController;
-  final TextEditingController acdvIdController;
+  // final TextEditingController acdvIdController;
   String? selectedSex;
   DateTime? selectedDate;
   String? selectedRole; 
@@ -17,13 +17,13 @@ class MemberFormData {
   MemberFormData()
       : fullnameController = TextEditingController(),
         addressController = TextEditingController(),
-        acdvIdController = TextEditingController(),
+        // acdvIdController = TextEditingController(),
         formKey = GlobalKey<FormState>();
 
   void dispose() {
     fullnameController.dispose();
     addressController.dispose();
-    acdvIdController.dispose();
+    // acdvIdController.dispose();
   }
 }
 
@@ -235,7 +235,7 @@ class _x_teamAddState extends State<x_teamAdd> {
             'dateOfBirth': DateFormat('yyyy-MM-dd').format(formData.selectedDate!),
             'address': formData.addressController.text.trim(),
             'sex': formData.selectedSex!,
-            'acdvId': formData.acdvIdController.text.trim(),
+            // 'acdvId': formData.acdvIdController.text.trim(),
             'role': formData.selectedRole!,
           };
         }
@@ -277,17 +277,17 @@ class _x_teamAddState extends State<x_teamAdd> {
               if (duplicates['email'] is bool && duplicates['email'] == true) {
                 message += '- Email already exists.\n';
               }
-              if (duplicates['phoneNo'] is bool && duplicates['phoneNo'] == true) {
+              if (duplicates['phone'] is bool && duplicates['phone'] == true) {
                 message += '- Phone number already exists.\n';
               }
 
-              if (duplicates.containsKey('acdvId') && duplicates['acdvId'] is List) {
+              /*if (duplicates.containsKey('acdvId') && duplicates['acdvId'] is List) {
                 final duplicateIds = duplicates['acdvId'] as List<dynamic>;
                 message += '- The following ACDV IDs already exist:\n';
                 for (var id in duplicateIds) {
                   message += '  - "$id"\n';
                 }
-              }
+              } */
             }
 
             if (message == 'Failed to register team. The following issues were found:\n') {
@@ -531,7 +531,7 @@ class _x_teamAddState extends State<x_teamAdd> {
                 _buildDatePickerField('Date of Birth', formData.selectedDate, formData),
                 _buildAddressField('Address', formData.addressController),
                 _buildRadioButtons(formData),
-                _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController, type: 'acdvId'),
+                // _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController, type: 'acdvId'),
                 _buildRoleDropdown(formData), 
               ],
             ),
@@ -648,8 +648,8 @@ class _x_teamAddState extends State<x_teamAdd> {
                   return 100;
                 case 'fullname':
                   return 50;
-                case 'acdvId':
-                  return 16;
+                /*case 'acdvId':
+                  return 16;*/
                 default:
                   return null; 
               }

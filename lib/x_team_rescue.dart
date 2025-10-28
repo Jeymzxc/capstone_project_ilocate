@@ -519,12 +519,12 @@ class MemberDetails extends StatelessWidget {
                 Icons.person,
                 ilocateRed,
               ),
-              _buildDetailCard(
+              /*_buildDetailCard(
                 'ACDV ID',
                 member['acdvId'] ?? 'N/A',
                 Icons.badge,
                 ilocateRed,
-              ),
+              ),*/
               _buildDetailCard(
                 'Role',
                 member['role'] ?? 'N/A',

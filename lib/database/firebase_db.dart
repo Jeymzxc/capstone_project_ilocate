@@ -573,7 +573,7 @@ class DatabaseService {
       'username': false,
       'email': false,
       'phone': false,
-      'acdvId': false,
+      // 'acdvId': false, commented out since MDRRMO doesn't have this at the moment
     };
 
     try {
@@ -624,14 +624,14 @@ class DatabaseService {
       'username': false,
       'email': false,
       'phone': false,
-      'acdvId': false,
+      // 'acdvId': false, - Removed as per MDRRMO Request
     };
 
     try {
       final username = adminData['username'];
       final email = adminData['email'];
       final phone = adminData['phone'];
-      final acdvId = adminData['acdvId'];
+      // final acdvId = adminData['acdvId'];
 
       // Use Future.wait to check all uniqueness constraints in parallel for efficiency
       final results = await Future.wait([
@@ -642,18 +642,18 @@ class DatabaseService {
         _db.child('admins').orderByChild('phone').equalTo(phone).once(),
         _db.child('teams').orderByChild('phoneNo').equalTo(phone).once(),
         _db.child('devices').orderByChild('phone').equalTo(phone).once(),
-        _isAcdvIdUnique(acdvId),
+        // _isAcdvIdUnique(acdvId),
       ]);
 
       // Explicitly cast the first six results to DatabaseEvent
-      final usernameAdminEvent = results[0] as DatabaseEvent;
-      final usernameTeamEvent = results[1] as DatabaseEvent;
-      final emailAdminEvent = results[2] as DatabaseEvent;
-      final emailTeamEvent = results[3] as DatabaseEvent;
-      final phoneAdminEvent = results[4] as DatabaseEvent;
-      final phoneTeamEvent = results[5] as DatabaseEvent;
-      final phoneDeviceEvent = results[6] as DatabaseEvent;
-      final isAcdvIdUniqueResult = results[7] as bool;
+      final usernameAdminEvent = results[0];
+      final usernameTeamEvent = results[1];
+      final emailAdminEvent = results[2];
+      final emailTeamEvent = results[3];
+      final phoneAdminEvent = results[4];
+      final phoneTeamEvent = results[5];
+      final phoneDeviceEvent = results[6];
+      // final isAcdvIdUniqueResult = results[7] as bool;
 
       if (usernameAdminEvent.snapshot.value != null || usernameTeamEvent.snapshot.value != null) {
         duplicates['username'] = true;
@@ -665,9 +665,9 @@ class DatabaseService {
         duplicates['phone'] = true;
       }
 
-      if (isAcdvIdUniqueResult == false) {
-        duplicates['acdvId'] = true;
-      }
+      //if (isAcdvIdUniqueResult == false) {
+      //  duplicates['acdvId'] = true;
+      //}
 
       return duplicates;
     } catch (e) {
@@ -709,7 +709,7 @@ class DatabaseService {
   }
 
   // Check for a unique ACDV ID across both admins and rescuers.
-  Future<bool> _isAcdvIdUnique(String acdvId) async {
+  /*Future<bool> _isAcdvIdUnique(String acdvId) async {
     try {
       // Check 'admins' database for duplicate ACDV ID
       Query adminQuery = _db.child('admins').orderByChild('acdvId').equalTo(acdvId);
@@ -739,7 +739,7 @@ class DatabaseService {
       debugPrint('Firebase error while checking ACDV ID uniqueness: $e');
       return false; // Assume not unique on error
     }
-  }
+  } */
 
 
 
@@ -750,24 +750,9 @@ class DatabaseService {
   // Creates New Team using Firebase Auth
   Future<Map<String, dynamic>> createTeam(Map<String, dynamic> teamData) async {
     try {
-      // Check duplicates like before
       Map<String, dynamic> duplicates = await _checkTeamDuplicates(teamData);
 
-      // Check for duplicate ACDV IDs among members
-      List<String> duplicateAcdvIds = [];
-      final membersData = teamData['members'] as Map<String, dynamic>;
-      for (var memberData in membersData.values) {
-        final isUnique = await _isAcdvIdUnique(memberData['acdvId']);
-        if (!isUnique) {
-          duplicateAcdvIds.add(memberData['acdvId']);
-        }
-      }
-
-      if (duplicateAcdvIds.isNotEmpty) {
-        duplicates['acdvId'] = duplicateAcdvIds;
-      }
-
-      if (duplicates.containsValue(true) || duplicateAcdvIds.isNotEmpty) {
+      if (duplicates.containsValue(true)) {
         return {'success': false, 'duplicates': duplicates};
       }
 
@@ -814,11 +799,6 @@ class DatabaseService {
     // Adds a new member to a specific team.
     Future<Map<String, dynamic>> addTeamMember(String teamId, Map<String, dynamic> memberData) async {
       try {
-        final isUnique = await _isAcdvIdUnique(memberData['acdvId']);
-        if (!isUnique) {
-          return {'success': false, 'message': 'ACDV ID already exists.'};
-      }
-
         await _db.child('teams').child(teamId).child('members').push().set(memberData);
         debugPrint('Member added to team $teamId successfully');
         return {'success': true};

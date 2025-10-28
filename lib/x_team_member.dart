@@ -6,7 +6,7 @@ import 'database/firebase_db.dart';
 class MemberFormData {
   final TextEditingController fullnameController;
   final TextEditingController addressController;
-  final TextEditingController acdvIdController;
+  // final TextEditingController acdvIdController;
   String? selectedSex;
   DateTime? selectedDate;
   String? selectedRole;
@@ -15,13 +15,13 @@ class MemberFormData {
   MemberFormData()
       : fullnameController = TextEditingController(),
         addressController = TextEditingController(),
-        acdvIdController = TextEditingController(),
+        // acdvIdController = TextEditingController(),
         formKey = GlobalKey<FormState>();
 
   void dispose() {
     fullnameController.dispose();
     addressController.dispose();
-    acdvIdController.dispose();
+    // acdvIdController.dispose();
   }
 }
 
@@ -210,7 +210,7 @@ class _x_teamMemberState extends State<x_teamMember> {
             'dateOfBirth': DateFormat('yyyy-MM-dd').format(formData.selectedDate!),
             'address': formData.addressController.text.trim(),
             'sex': formData.selectedSex!,
-            'acdvId': formData.acdvIdController.text.trim(),
+            // 'acdvId': formData.acdvIdController.text.trim(),
             'role': formData.selectedRole!,
           };
           
@@ -219,10 +219,10 @@ class _x_teamMemberState extends State<x_teamMember> {
           if (result['success'] == false) {
             String errorMessage = result['message'] ?? 'An unknown error occurred while adding a member.';
     
-            if (errorMessage.contains('ACDV ID already exists.')) {
+           /* if (errorMessage.contains('ACDV ID already exists.')) {
               // Get the ACDV ID from the form and append it to the message
               errorMessage = '- ACDV ID "${memberData['acdvId']}" already exists.';
-            }
+            }*/
             
             await _showCustomDialog(
               title: 'Error',
@@ -462,7 +462,7 @@ class _x_teamMemberState extends State<x_teamMember> {
                 _buildDatePickerField('Date of Birth', formData.selectedDate, formData),
                 _buildAddressField('Address', formData.addressController),
                 _buildRadioButtons(formData),
-                _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController, type: 'acdvId'),
+                // _buildTextField('Accredited Community Disaster Volunteer (ACDV) ID Number', formData.acdvIdController, type: 'acdvId'),
                 _buildRoleDropdown(formData),
               ],
             ),
@@ -564,8 +564,8 @@ class _x_teamMemberState extends State<x_teamMember> {
               switch (type) {
                 case 'fullname':
                   return 50;
-                case 'acdvId':
-                  return 16;
+                //case 'acdvId':
+                //  return 16;
                 default:
                   return null; 
               }
