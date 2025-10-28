@@ -366,6 +366,7 @@ class _ActiveTabState extends State<ActiveTab>
 
       return status != 'PENDING' && matchesStatus && matchesQuery;
     }).toList();
+    
   }
 
   @override
@@ -656,6 +657,129 @@ class _ArchivedTabState extends State<ArchivedTab>
     );
   }
 
+  void _showDeleteConfirmationDialog(Map<String, dynamic> log) {
+    final incidentId = log['id'] ?? 'N/A';
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: const EdgeInsets.all(0),
+          content: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Red header bar
+                  Container(height: 4, color: const Color(0xFFC70000)),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header row
+                        Row(
+                          children: const [
+                            Icon(Icons.delete_forever_rounded,
+                                color: Color(0xFFC70000), size: 32),
+                            SizedBox(width: 8),
+                            Text(
+                              'CONFIRM DELETION',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFC70000),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.black26),
+                        const SizedBox(height: 8),
+                        // Message
+                        Text(
+                          'Are you sure you want to permanently delete Incident $incidentId?',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'This action cannot be undone.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.red,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // Buttons
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFFC70000)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: const Text(
+                                'NO',
+                                style: TextStyle(color: Color(0xFFC70000)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () async {
+                                Navigator.of(context).pop();
+                                try {
+                                  await widget.dbService.deleteArchivedIncident(incidentId);
+                                  _showCustomDialog(
+                                    title: 'Deleted',
+                                    message:
+                                        'Incident $incidentId has been permanently deleted.',
+                                    headerColor: const Color(0xFFC70000),
+                                    icon: Icons.delete_outline_rounded,
+                                  );
+                                } catch (e) {
+                                  _showCustomDialog(
+                                    title: 'Error',
+                                    message:
+                                        'Failed to delete incident. Please try again.',
+                                    headerColor: const Color(0xFFC70000),
+                                    icon: Icons.error_outline_rounded,
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFC70000),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: const Text(
+                                'YES',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+
   void _unarchiveLog(Map<String, dynamic> log) async {
     final incidentId = log['id']!;
     try {
@@ -719,6 +843,7 @@ class _ArchivedTabState extends State<ArchivedTab>
                 isExpanded: isExpanded,
                 onToggle: () => _toggleExpansion(log['id']),
                 onArchive: () => _showUnarchiveConfirmationDialog(log),
+                onDelete: () => _showDeleteConfirmationDialog(log),
                 isArchivedView: true,
                 getDeviceInfo: widget.getDeviceInfo,
               ),
@@ -744,6 +869,7 @@ class LogCard extends StatelessWidget {
   final VoidCallback onArchive;
   final bool isArchivedView;
   final Future<Map<String, dynamic>?> Function(String)? getDeviceInfo;
+  final VoidCallback? onDelete;
 
   const LogCard({
     super.key,
@@ -753,6 +879,7 @@ class LogCard extends StatelessWidget {
     required this.onArchive,
     required this.isArchivedView,
     this.getDeviceInfo,
+    this.onDelete,
   });
 
   String formatStatus(String status) {
@@ -788,12 +915,11 @@ class LogCard extends StatelessWidget {
     String formatTime(int timestamp) =>
         DateFormat('h:mm a').format(DateTime.fromMillisecondsSinceEpoch(timestamp));
 
-    final String date = log['firstTimestamp'] != null
-        ? formatDate(log['firstTimestamp'])
-        : 'N/A';
-    final String time = log['firstTimestamp'] != null
-        ? formatTime(log['firstTimestamp'])
-        : 'N/A';
+    final int timestamp = log['lastTimestamp'] ?? log['firstTimestamp'] ?? 0;
+
+    final String date = timestamp != 0 ? formatDate(timestamp) : 'N/A';
+    final String time = timestamp != 0 ? formatTime(timestamp) : 'N/A';
+
     final String heartRate =
         valueData['heartRate'] != null ? '${valueData['heartRate']} BPM' : 'N/A';
     final String location =
@@ -918,32 +1044,72 @@ class LogCard extends StatelessWidget {
                     const SizedBox(height: 16),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: SizedBox(
-                        width: 120,
-                        child: isArchivedView
-                            ? ElevatedButton(
-                                onPressed: onArchive,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), 
-                                ),
-                                child: const Text(
-                                  'UNARCHIVE',
-                                  style: TextStyle(fontSize: 12.0), 
-                                ),
-                              )
-                            : OutlinedButton(
-                                onPressed: status.toLowerCase() == 'resolved' ? onArchive : null,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: status.toLowerCase() == 'resolved' ? Colors.red : Colors.grey,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), 
-                                ),
-                                child: const Text(
-                                  'ARCHIVE',
-                                  style: TextStyle(fontSize: 12.0), 
+                      child: Wrap(
+                        spacing: 10, 
+                        children: [
+                          if (isArchivedView) ...[
+                            // DELETE button
+                            ElevatedButton(
+                              onPressed: onDelete,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(100, 40), 
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              ),
+                              child: const Text(
+                                'DELETE',
+                                style: TextStyle(
+                                  fontSize: 13.0,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
+                            ),
+
+                            // UNARCHIVE button
+                            ElevatedButton(
+                              onPressed: onArchive,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(100, 40), 
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              ),
+                              child: const Text(
+                                'UNARCHIVE',
+                                style: TextStyle(
+                                  fontSize: 13.0,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            // ARCHIVE button
+                            OutlinedButton(
+                              onPressed: status.toLowerCase() == 'resolved' ? onArchive : null,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: status.toLowerCase() == 'resolved'
+                                    ? Colors.red
+                                    : Colors.grey,
+                                side: BorderSide(
+                                  color: status.toLowerCase() == 'resolved'
+                                      ? Colors.red
+                                      : Colors.grey,
+                                  width: 1.5,
+                                ),
+                                minimumSize: const Size(100, 40), 
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              ),
+                              child: const Text(
+                                'ARCHIVE',
+                                style: TextStyle(
+                                  fontSize: 13.0,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ],

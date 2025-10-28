@@ -23,17 +23,14 @@ class _wAlertsState extends State<wAlerts> {
     super.initState();
 
     // Subscribe to TTN distress alerts
-   _ttnSubscription = _databaseService.streamTtnDistressData().listen((alerts) async {
+    _ttnSubscription = _databaseService.streamTtnDistressData().listen((alerts) {
       for (var alert in alerts) {
-        try {
-   
-          await _databaseService.createIncident(alert, '');
-        } catch (e) {
-          debugPrint("Error processing incoming alert for device ${alert['deviceId']}: $e");
-        }
+        debugPrint("📡 Incoming TTN alert from device ${alert['device']} - distress: ${alert['value']['distress']}");
       }
+      setState(() {});
     });
   }
+
 
   @override
   void dispose() {
@@ -239,7 +236,7 @@ class _wAlertsState extends State<wAlerts> {
     );
   }
 
-  // Reusable cancel confirmation dialog (kept similar to your previous)
+  // Reusable cancel confirmation dialog 
   Future<void> _showCancelConfirmationDialog(String incidentId) async {
     const Color ilocateRed = Color(0xFFC70000);
     bool isCancelling = false;
